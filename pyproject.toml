@@ -10,13 +10,12 @@ astropy = "*"
 numpy = "*"
 pandas = "*"
 matplotlib = "*"
-jax = {extras = ["cpu"], version = ">=0.4,<0.5"}
-numpyro = "*"
+#jax = {extras = ["cpu"], version = ">=0.4,<0.5.1"}
+#numpyro = "*"
 ipython = ">=9,<10"
 astroquery = "^0.4.11"
 pyneb = "^1.1.28"
-msaexp = "^0.9.12"
-dust-attenuation = {git = "https://github.com/karllark/dust_attenuation.git"}
+ipykernel = "^7.1.0"
 
 [tool.poetry.group.test.dependencies]
 pytest = "*"
