@@ -1,0 +1,26 @@
+[tool.poetry]
+name = "dotfit"
+version = "0.0.1"
+authors = ["Ivo Labbe <ivolabbe@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = ">=3.12"
+astropy = "*"
+numpy = "*"
+pandas = "*"
+matplotlib = "*"
+jax = {extras = ["cpu"], version = ">=0.4,<0.5"}
+numpyro = "*"
+ipython = ">=9,<10"
+astroquery = "^0.4.11"
+pyneb = "^1.1.28"
+msaexp = "^0.9.12"
+dust-attenuation = {git = "https://github.com/karllark/dust_attenuation.git"}
+
+[tool.poetry.group.test.dependencies]
+pytest = "*"
+
+[build-system]
+requires = ["poetry-core>=1.9.0"]
+build-backend = "poetry.core.masonry.api"

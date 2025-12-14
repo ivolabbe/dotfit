@@ -1,0 +1,12 @@
+from:
+
+http://astronomy.nmsu.edu/drewski/tableofemissionlines.html#a1
+
+
+This page tabulates wavelengths and atomic transition data for emission lines from 700-11,000Å that have historically been observed in the spectra of galaxies, active galactic nuclei (AGN), and quasi-stellar objects (QSOs). This page does not theorize on lines that could or should be observed in such objects - only lines that have been observed are listed. References to journal papers where lines were identified are provided in the final column. These references are not intended to be exhaustive (I simply list the first paper where I found a line being identified, preferably with a plot of the spectrum clearly shown). Full 'Observation References' are here.
+
+Transition data (columns 1-8) from the NIST Atomic Spectra database are used with permission from John Curry, Director of the NIST Atomic Spectroscopy Data Center (full citation here). Note that semi-forbidden/intercombination notation (for example, O IV]) is used to indicate transitions which violate the ΔS=0 rule. Also, fine and hyperfine structure for H transitions are excluded for now, while links to snapshots of data on blended He I and He II transitions are provided. Given sufficient literature evidence, data for all contributions to blends of two or three lines are provided.
+
+Vacuum wavelengths are given for lines with λ < 2000Å; air wavelengths are given for lines with λ > 2000Å. 'Creation' ionization potentials are provided (i.e. 207.27 eV is necessary to ionize Ne VII and create Ne VIII).
+
+

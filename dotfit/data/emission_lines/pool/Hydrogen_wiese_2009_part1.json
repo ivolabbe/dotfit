@@ -1,0 +1,3203 @@
+[
+    {
+        "meta_data": {
+            "title": "hydrogen_table.pdf",
+            "doc_id": "689111b8abf142929009e7391ce67daa",
+            "type": "table_vision",
+            "uploaded_from": "api",
+            "user_doc_id": null,
+            "doc_meta_data": "",
+            "folder_name": "",
+            "folder_id": "",
+            "created_at_iso": "2024-12-10T03:58:47+00:00",
+            "modified_at_iso": "2024-12-10T03:59:16+00:00",
+            "status": "reviewing",
+            "review_url": "https://app.docsumo.com/review-document/689111b8abf142929009e7391ce67daa"
+        },
+        "data": {
+            "Tables": {
+                "Table 5": [
+                    {
+                        "No.": {
+                            "value": "1",
+                            "position": [
+                                310,
+                                1571,
+                                369,
+                                1597
+                            ],
+                            "confidence": 1.0,
+                            "review_required": false
+                        },
+                        "Transition": {
+                            "value": "1-2",
+                            "position": [
+                                204,
+                                1624,
+                                273,
+                                1644
+                            ],
+                            "confidence": 1.0,
+                            "review_required": false
+                        },
+                        "\u03bbair (\u00c5)": {
+                            "value": "",
+                            "position": [
+                                293,
+                                1604,
+                                399,
+                                1646
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Avac (\u00c5) or \u03c3 (cm)a": {
+                            "value": "1 215.67",
+                            "position": [
+                                453,
+                                1626,
+                                520,
+                                1639
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "E (cm-\u00b9)": {
+                            "value": "0.000",
+                            "position": [
+                                618,
+                                1627,
+                                662,
+                                1640
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Ek (cm\u00b9)": {
+                            "value": "82 259.163",
+                            "position": [
+                                702,
+                                1627,
+                                789,
+                                1640
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "8i-8k": {
+                            "value": "2-8",
+                            "position": [
+                                860,
+                                1627,
+                                892,
+                                1639
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Aki (108 s-1)": {
+                            "value": "4.6986e+00",
+                            "position": [
+                                938,
+                                1627,
+                                1036,
+                                1640
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "fik": {
+                            "value": "4.1641e-01",
+                            "position": [
+                                1067,
+                                1626,
+                                1162,
+                                1640
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "S (a.u.)": {
+                            "value": "3.3331e+00",
+                            "position": [
+                                1196,
+                                1626,
+                                1291,
+                                1640
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "log gf": {
+                            "value": "-0.079 45",
+                            "position": [
+                                1322,
+                                1627,
+                                1401,
+                                1640
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Acc.": {
+                            "value": "AAA",
+                            "position": [
+                                1432,
+                                1627,
+                                1475,
+                                1639
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Source": {
+                            "value": "4",
+                            "position": [
+                                1527,
+                                1627,
+                                1539,
+                                1638
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        }
+                    },
+                    {
+                        "No.": {
+                            "value": "2",
+                            "position": [
+                                152,
+                                1657,
+                                161,
+                                1669
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Transition": {
+                            "value": "1-3",
+                            "position": [
+                                203,
+                                1653,
+                                274,
+                                1675
+                            ],
+                            "confidence": 1.0,
+                            "review_required": false
+                        },
+                        "\u03bbair (\u00c5)": {
+                            "value": "",
+                            "position": [
+                                293,
+                                1646,
+                                399,
+                                1677
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Avac (\u00c5) or \u03c3 (cm)a": {
+                            "value": "1 025.72",
+                            "position": [
+                                453,
+                                1657,
+                                520,
+                                1670
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "E (cm-\u00b9)": {
+                            "value": "0.000",
+                            "position": [
+                                619,
+                                1655,
+                                662,
+                                1670
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Ek (cm\u00b9)": {
+                            "value": "97 492.283",
+                            "position": [
+                                701,
+                                1657,
+                                790,
+                                1669
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "8i-8k": {
+                            "value": "2-18",
+                            "position": [
+                                852,
+                                1657,
+                                891,
+                                1669
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Aki (108 s-1)": {
+                            "value": "5.5751e-01",
+                            "position": [
+                                939,
+                                1655,
+                                1034,
+                                1671
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "fik": {
+                            "value": "7.9142e-02",
+                            "position": [
+                                1068,
+                                1657,
+                                1165,
+                                1670
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "S (a.u.)": {
+                            "value": "5.3450e-01",
+                            "position": [
+                                1195,
+                                1657,
+                                1290,
+                                1670
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "log gf": {
+                            "value": "-0.800 56",
+                            "position": [
+                                1324,
+                                1657,
+                                1403,
+                                1669
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Acc.": {
+                            "value": "\u0410\u0410\u0410",
+                            "position": [
+                                1432,
+                                1658,
+                                1476,
+                                1670
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Source": {
+                            "value": "4",
+                            "position": [
+                                1527,
+                                1658,
+                                1538,
+                                1670
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        }
+                    },
+                    {
+                        "No.": {
+                            "value": "3",
+                            "position": [
+                                153,
+                                1689,
+                                162,
+                                1700
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Transition": {
+                            "value": "1-4",
+                            "position": [
+                                203,
+                                1683,
+                                273,
+                                1705
+                            ],
+                            "confidence": 1.0,
+                            "review_required": false
+                        },
+                        "\u03bbair (\u00c5)": {
+                            "value": "",
+                            "position": [
+                                293,
+                                1677,
+                                399,
+                                1708
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Avac (\u00c5) or \u03c3 (cm)a": {
+                            "value": "972.537",
+                            "position": [
+                                466,
+                                1688,
+                                529,
+                                1701
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "E (cm-\u00b9)": {
+                            "value": "0.000",
+                            "position": [
+                                618,
+                                1688,
+                                662,
+                                1701
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Ek (cm\u00b9)": {
+                            "value": "102 823.879",
+                            "position": [
+                                699,
+                                1688,
+                                795,
+                                1701
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "8i-8k": {
+                            "value": "2-32",
+                            "position": [
+                                853,
+                                1688,
+                                891,
+                                1700
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Aki (108 s-1)": {
+                            "value": "1.2785e-01",
+                            "position": [
+                                941,
+                                1686,
+                                1036,
+                                1701
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "fik": {
+                            "value": "2.9006e-02",
+                            "position": [
+                                1067,
+                                1688,
+                                1164,
+                                1701
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "S (a.u.)": {
+                            "value": "1.8574e-01",
+                            "position": [
+                                1197,
+                                1688,
+                                1291,
+                                1701
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "log gf": {
+                            "value": "-1.236 48",
+                            "position": [
+                                1323,
+                                1688,
+                                1402,
+                                1700
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Acc.": {
+                            "value": "AAA",
+                            "position": [
+                                1433,
+                                1689,
+                                1476,
+                                1700
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Source": {
+                            "value": "4",
+                            "position": [
+                                1528,
+                                1689,
+                                1538,
+                                1700
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        }
+                    },
+                    {
+                        "No.": {
+                            "value": "4",
+                            "position": [
+                                152,
+                                1719,
+                                162,
+                                1730
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Transition": {
+                            "value": "1-5",
+                            "position": [
+                                204,
+                                1714,
+                                271,
+                                1734
+                            ],
+                            "confidence": 1.0,
+                            "review_required": false
+                        },
+                        "\u03bbair (\u00c5)": {
+                            "value": "",
+                            "position": [
+                                293,
+                                1708,
+                                399,
+                                1738
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Avac (\u00c5) or \u03c3 (cm)a": {
+                            "value": "949.743",
+                            "position": [
+                                466,
+                                1718,
+                                529,
+                                1731
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "E (cm-\u00b9)": {
+                            "value": "0.000",
+                            "position": [
+                                618,
+                                1718,
+                                662,
+                                1731
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Ek (cm\u00b9)": {
+                            "value": "105 291.644",
+                            "position": [
+                                699,
+                                1718,
+                                794,
+                                1732
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "8i-8k": {
+                            "value": "2-50",
+                            "position": [
+                                852,
+                                1718,
+                                893,
+                                1731
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Aki (108 s-1)": {
+                            "value": "4.1250e-02",
+                            "position": [
+                                939,
+                                1716,
+                                1036,
+                                1731
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "fik": {
+                            "value": "1.3945e-02",
+                            "position": [
+                                1069,
+                                1718,
+                                1164,
+                                1731
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "S (a.u.)": {
+                            "value": "8.7206e-02",
+                            "position": [
+                                1196,
+                                1717,
+                                1291,
+                                1731
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "log gf": {
+                            "value": "-1.554 54",
+                            "position": [
+                                1323,
+                                1718,
+                                1402,
+                                1731
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Acc.": {
+                            "value": "AAA",
+                            "position": [
+                                1433,
+                                1719,
+                                1474,
+                                1731
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Source": {
+                            "value": "4",
+                            "position": [
+                                1528,
+                                1719,
+                                1538,
+                                1730
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        }
+                    },
+                    {
+                        "No.": {
+                            "value": "5",
+                            "position": [
+                                152,
+                                1749,
+                                162,
+                                1760
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Transition": {
+                            "value": "1-6",
+                            "position": [
+                                205,
+                                1746,
+                                273,
+                                1765
+                            ],
+                            "confidence": 1.0,
+                            "review_required": false
+                        },
+                        "\u03bbair (\u00c5)": {
+                            "value": "",
+                            "position": [
+                                293,
+                                1738,
+                                399,
+                                1769
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Avac (\u00c5) or \u03c3 (cm)a": {
+                            "value": "937.803",
+                            "position": [
+                                466,
+                                1749,
+                                529,
+                                1761
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "E (cm-\u00b9)": {
+                            "value": "0.000",
+                            "position": [
+                                618,
+                                1748,
+                                661,
+                                1762
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Ek (cm\u00b9)": {
+                            "value": "106 632.158",
+                            "position": [
+                                699,
+                                1749,
+                                793,
+                                1761
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "8i-8k": {
+                            "value": "2-72",
+                            "position": [
+                                852,
+                                1749,
+                                891,
+                                1762
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Aki (108 s-1)": {
+                            "value": "1.6440e-02",
+                            "position": [
+                                941,
+                                1749,
+                                1036,
+                                1762
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "fik": {
+                            "value": "7.8035e-03",
+                            "position": [
+                                1068,
+                                1747,
+                                1164,
+                                1763
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "S (a.u.)": {
+                            "value": "4.8184e-02",
+                            "position": [
+                                1195,
+                                1747,
+                                1290,
+                                1762
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "log gf": {
+                            "value": "-1.806 68",
+                            "position": [
+                                1323,
+                                1749,
+                                1402,
+                                1762
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Acc.": {
+                            "value": "AAA",
+                            "position": [
+                                1432,
+                                1750,
+                                1475,
+                                1762
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Source": {
+                            "value": "4",
+                            "position": [
+                                1527,
+                                1750,
+                                1537,
+                                1761
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        }
+                    },
+                    {
+                        "No.": {
+                            "value": "6",
+                            "position": [
+                                153,
+                                1779,
+                                164,
+                                1791
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Transition": {
+                            "value": "1-7",
+                            "position": [
+                                225,
+                                1779,
+                                254,
+                                1791
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "\u03bbair (\u00c5)": {
+                            "value": "",
+                            "position": [
+                                293,
+                                1769,
+                                399,
+                                1799
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Avac (\u00c5) or \u03c3 (cm)a": {
+                            "value": "930.748",
+                            "position": [
+                                466,
+                                1777,
+                                528,
+                                1792
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "E (cm-\u00b9)": {
+                            "value": "0.000",
+                            "position": [
+                                618,
+                                1776,
+                                661,
+                                1791
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Ek (cm\u00b9)": {
+                            "value": "107 440.444",
+                            "position": [
+                                699,
+                                1779,
+                                793,
+                                1792
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "8i-8k": {
+                            "value": "2-98",
+                            "position": [
+                                852,
+                                1778,
+                                890,
+                                1792
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Aki (108 s-1)": {
+                            "value": "7.5684e-03",
+                            "position": [
+                                940,
+                                1776,
+                                1036,
+                                1792
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "fik": {
+                            "value": "4.8164e-03",
+                            "position": [
+                                1067,
+                                1778,
+                                1163,
+                                1792
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "S (a.u.)": {
+                            "value": "2.9516e-02",
+                            "position": [
+                                1195,
+                                1779,
+                                1291,
+                                1792
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "log gf": {
+                            "value": "-2.016 25",
+                            "position": [
+                                1323,
+                                1779,
+                                1401,
+                                1791
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Acc.": {
+                            "value": "\u0410\u0410\u0410",
+                            "position": [
+                                1432,
+                                1780,
+                                1475,
+                                1792
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Source": {
+                            "value": "4",
+                            "position": [
+                                1527,
+                                1779,
+                                1538,
+                                1790
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        }
+                    },
+                    {
+                        "No.": {
+                            "value": "7",
+                            "position": [
+                                152,
+                                1810,
+                                162,
+                                1823
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Transition": {
+                            "value": "1-8",
+                            "position": [
+                                224,
+                                1810,
+                                254,
+                                1822
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "\u03bbair (\u00c5)": {
+                            "value": "",
+                            "position": [
+                                293,
+                                1799,
+                                399,
+                                1830
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Avac (\u00c5) or \u03c3 (cm)a": {
+                            "value": "926.223",
+                            "position": [
+                                466,
+                                1807,
+                                529,
+                                1823
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "E (cm-\u00b9)": {
+                            "value": "0.000",
+                            "position": [
+                                618,
+                                1810,
+                                662,
+                                1823
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Ek (cm\u00b9)": {
+                            "value": "107 965.321",
+                            "position": [
+                                699,
+                                1810,
+                                793,
+                                1822
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "8i-8k": {
+                            "value": "2-128",
+                            "position": [
+                                843,
+                                1810,
+                                891,
+                                1823
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Aki (108 s-1)": {
+                            "value": "3.8694e-03",
+                            "position": [
+                                940,
+                                1806,
+                                1037,
+                                1823
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "fik": {
+                            "value": "3.1850e-03",
+                            "position": [
+                                1068,
+                                1807,
+                                1165,
+                                1824
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "S (a.u.)": {
+                            "value": "1.9424e-02",
+                            "position": [
+                                1198,
+                                1810,
+                                1291,
+                                1823
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "log gf": {
+                            "value": "-2.195 86",
+                            "position": [
+                                1324,
+                                1807,
+                                1402,
+                                1822
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Acc.": {
+                            "value": "\u0410\u0410\u0410",
+                            "position": [
+                                1433,
+                                1808,
+                                1475,
+                                1823
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Source": {
+                            "value": "4",
+                            "position": [
+                                1528,
+                                1811,
+                                1538,
+                                1822
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        }
+                    },
+                    {
+                        "No.": {
+                            "value": "8",
+                            "position": [
+                                153,
+                                1841,
+                                161,
+                                1852
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Transition": {
+                            "value": "1-9",
+                            "position": [
+                                224,
+                                1841,
+                                253,
+                                1854
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "\u03bbair (\u00c5)": {
+                            "value": "",
+                            "position": [
+                                293,
+                                1830,
+                                399,
+                                1861
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Avac (\u00c5) or \u03c3 (cm)a": {
+                            "value": "923.148",
+                            "position": [
+                                466,
+                                1841,
+                                528,
+                                1854
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "E (cm-\u00b9)": {
+                            "value": "0.000",
+                            "position": [
+                                618,
+                                1839,
+                                661,
+                                1854
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Ek (cm\u00b9)": {
+                            "value": "108 324.992",
+                            "position": [
+                                699,
+                                1840,
+                                794,
+                                1855
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "8i-8k": {
+                            "value": "2-162",
+                            "position": [
+                                843,
+                                1841,
+                                890,
+                                1854
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Aki (108 s-1)": {
+                            "value": "2.1425e-03",
+                            "position": [
+                                939,
+                                1841,
+                                1037,
+                                1854
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "fik": {
+                            "value": "2.2172e-03",
+                            "position": [
+                                1067,
+                                1841,
+                                1164,
+                                1854
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "S (a.u.)": {
+                            "value": "1.3477e-02",
+                            "position": [
+                                1197,
+                                1840,
+                                1290,
+                                1854
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "log gf": {
+                            "value": "-2.353 16",
+                            "position": [
+                                1323,
+                                1839,
+                                1401,
+                                1854
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Acc.": {
+                            "value": "\u0410\u0410\u0410",
+                            "position": [
+                                1432,
+                                1842,
+                                1475,
+                                1854
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Source": {
+                            "value": "4",
+                            "position": [
+                                1527,
+                                1842,
+                                1537,
+                                1852
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        }
+                    },
+                    {
+                        "No.": {
+                            "value": "9",
+                            "position": [
+                                152,
+                                1871,
+                                163,
+                                1884
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Transition": {
+                            "value": "1-10",
+                            "position": [
+                                220,
+                                1871,
+                                258,
+                                1884
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "\u03bbair (\u00c5)": {
+                            "value": "",
+                            "position": [
+                                293,
+                                1861,
+                                399,
+                                1891
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Avac (\u00c5) or \u03c3 (cm)a": {
+                            "value": "920.961",
+                            "position": [
+                                466,
+                                1871,
+                                528,
+                                1883
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "E (cm-\u00b9)": {
+                            "value": "0.000",
+                            "position": [
+                                618,
+                                1868,
+                                663,
+                                1884
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Ek (cm\u00b9)": {
+                            "value": "108 582.262",
+                            "position": [
+                                699,
+                                1871,
+                                794,
+                                1884
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "8i-8k": {
+                            "value": "2-200",
+                            "position": [
+                                842,
+                                1870,
+                                891,
+                                1884
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Aki (108 s-1)": {
+                            "value": "1.2631e-03",
+                            "position": [
+                                941,
+                                1871,
+                                1036,
+                                1883
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "fik": {
+                            "value": "1.6062e-03",
+                            "position": [
+                                1069,
+                                1871,
+                                1165,
+                                1884
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "S (a.u.)": {
+                            "value": "9.7396e-03",
+                            "position": [
+                                1195,
+                                1871,
+                                1292,
+                                1884
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "log gf": {
+                            "value": "-2.493 18",
+                            "position": [
+                                1323,
+                                1871,
+                                1401,
+                                1883
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Acc.": {
+                            "value": "AAA",
+                            "position": [
+                                1432,
+                                1872,
+                                1475,
+                                1884
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Source": {
+                            "value": "4",
+                            "position": [
+                                1527,
+                                1872,
+                                1537,
+                                1883
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        }
+                    },
+                    {
+                        "No.": {
+                            "value": "10",
+                            "position": [
+                                144,
+                                1901,
+                                161,
+                                1914
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Transition": {
+                            "value": "1-11",
+                            "position": [
+                                220,
+                                1902,
+                                255,
+                                1915
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "\u03bbair (\u00c5)": {
+                            "value": "",
+                            "position": [
+                                293,
+                                1891,
+                                399,
+                                1922
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Avac (\u00c5) or \u03c3 (cm)a": {
+                            "value": "919.349",
+                            "position": [
+                                466,
+                                1902,
+                                528,
+                                1914
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "E (cm-\u00b9)": {
+                            "value": "0.000",
+                            "position": [
+                                617,
+                                1900,
+                                662,
+                                1916
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Ek (cm\u00b9)": {
+                            "value": "108 772.613",
+                            "position": [
+                                699,
+                                1902,
+                                794,
+                                1914
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "8i-8k": {
+                            "value": "2-242",
+                            "position": [
+                                842,
+                                1902,
+                                891,
+                                1915
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Aki (108 s-1)": {
+                            "value": "7.8340e-04",
+                            "position": [
+                                940,
+                                1902,
+                                1037,
+                                1914
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "fik": {
+                            "value": "1.2011e-03",
+                            "position": [
+                                1069,
+                                1902,
+                                1164,
+                                1915
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "S (a.u.)": {
+                            "value": "7.2707e-03",
+                            "position": [
+                                1196,
+                                1902,
+                                1292,
+                                1915
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "log gf": {
+                            "value": "-2.619 38",
+                            "position": [
+                                1323,
+                                1901,
+                                1402,
+                                1914
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Acc.": {
+                            "value": "AAA",
+                            "position": [
+                                1433,
+                                1903,
+                                1475,
+                                1914
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Source": {
+                            "value": "4",
+                            "position": [
+                                1528,
+                                1903,
+                                1538,
+                                1913
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        }
+                    },
+                    {
+                        "No.": {
+                            "value": "11",
+                            "position": [
+                                145,
+                                1931,
+                                159,
+                                1944
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Transition": {
+                            "value": "1-12",
+                            "position": [
+                                220,
+                                1930,
+                                257,
+                                1945
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "\u03bbair (\u00c5)": {
+                            "value": "",
+                            "position": [
+                                293,
+                                1922,
+                                399,
+                                1952
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Avac (\u00c5) or \u03c3 (cm)a": {
+                            "value": "918.127",
+                            "position": [
+                                466,
+                                1929,
+                                528,
+                                1945
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "E (cm-\u00b9)": {
+                            "value": "0.000",
+                            "position": [
+                                618,
+                                1932,
+                                662,
+                                1945
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Ek (cm\u00b9)": {
+                            "value": "108 917.391",
+                            "position": [
+                                699,
+                                1931,
+                                794,
+                                1947
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "8i-8k": {
+                            "value": "2-288",
+                            "position": [
+                                843,
+                                1931,
+                                890,
+                                1945
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Aki (108 s-1)": {
+                            "value": "5.0659e-04",
+                            "position": [
+                                939,
+                                1931,
+                                1038,
+                                1945
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "fik": {
+                            "value": "9.2190e-04",
+                            "position": [
+                                1067,
+                                1932,
+                                1166,
+                                1945
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "S (a.u.)": {
+                            "value": "5.5730e-03",
+                            "position": [
+                                1195,
+                                1932,
+                                1292,
+                                1945
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "log gf": {
+                            "value": "-2.734 29",
+                            "position": [
+                                1323,
+                                1932,
+                                1401,
+                                1945
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Acc.": {
+                            "value": "AAA",
+                            "position": [
+                                1433,
+                                1933,
+                                1475,
+                                1944
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Source": {
+                            "value": "4",
+                            "position": [
+                                1527,
+                                1932,
+                                1538,
+                                1944
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        }
+                    },
+                    {
+                        "No.": {
+                            "value": "12",
+                            "position": [
+                                144,
+                                1963,
+                                160,
+                                1975
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Transition": {
+                            "value": "1-13",
+                            "position": [
+                                220,
+                                1962,
+                                257,
+                                1977
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "\u03bbair (\u00c5)": {
+                            "value": "",
+                            "position": [
+                                293,
+                                1952,
+                                399,
+                                1983
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Avac (\u00c5) or \u03c3 (cm)a": {
+                            "value": "917.178",
+                            "position": [
+                                466,
+                                1963,
+                                528,
+                                1976
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "E (cm-\u00b9)": {
+                            "value": "0.000",
+                            "position": [
+                                618,
+                                1962,
+                                661,
+                                1976
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Ek (cm\u00b9)": {
+                            "value": "109 030.061",
+                            "position": [
+                                699,
+                                1963,
+                                794,
+                                1976
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "8i-8k": {
+                            "value": "2-338",
+                            "position": [
+                                843,
+                                1962,
+                                890,
+                                1976
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Aki (108 s-1)": {
+                            "value": "3.3927e-04",
+                            "position": [
+                                940,
+                                1961,
+                                1036,
+                                1976
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "fik": {
+                            "value": "7.2310e-04",
+                            "position": [
+                                1068,
+                                1963,
+                                1164,
+                                1976
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "S (a.u.)": {
+                            "value": "4.3668e-03",
+                            "position": [
+                                1194,
+                                1963,
+                                1292,
+                                1976
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "log gf": {
+                            "value": "-2.839 77",
+                            "position": [
+                                1322,
+                                1962,
+                                1402,
+                                1976
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Acc.": {
+                            "value": "\u0410\u0410\u0410",
+                            "position": [
+                                1432,
+                                1964,
+                                1476,
+                                1976
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Source": {
+                            "value": "4",
+                            "position": [
+                                1528,
+                                1964,
+                                1539,
+                                1975
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        }
+                    },
+                    {
+                        "No.": {
+                            "value": "13",
+                            "position": [
+                                144,
+                                1993,
+                                162,
+                                2005
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Transition": {
+                            "value": "1-14",
+                            "position": [
+                                220,
+                                1992,
+                                256,
+                                2006
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "\u03bbair (\u00c5)": {
+                            "value": "",
+                            "position": [
+                                293,
+                                1983,
+                                399,
+                                2014
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Avac (\u00c5) or \u03c3 (cm)a": {
+                            "value": "916.427",
+                            "position": [
+                                466,
+                                1992,
+                                529,
+                                2006
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "E (cm-\u00b9)": {
+                            "value": "0.000",
+                            "position": [
+                                618,
+                                1993,
+                                663,
+                                2005
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Ek (cm\u00b9)": {
+                            "value": "109 119.462",
+                            "position": [
+                                699,
+                                1993,
+                                793,
+                                2006
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "8i-8k": {
+                            "value": "2-392",
+                            "position": [
+                                842,
+                                1991,
+                                891,
+                                2006
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Aki (108 s-1)": {
+                            "value": "2.3409e-04",
+                            "position": [
+                                939,
+                                1993,
+                                1036,
+                                2005
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "fik": {
+                            "value": "5.7769e-04",
+                            "position": [
+                                1067,
+                                1992,
+                                1165,
+                                2006
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "S (a.u.)": {
+                            "value": "3.4858e-03",
+                            "position": [
+                                1196,
+                                1992,
+                                1291,
+                                2006
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "log gf": {
+                            "value": "-2.937 27",
+                            "position": [
+                                1323,
+                                1993,
+                                1402,
+                                2005
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Acc.": {
+                            "value": "AAA",
+                            "position": [
+                                1432,
+                                1994,
+                                1475,
+                                2005
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Source": {
+                            "value": "4",
+                            "position": [
+                                1528,
+                                1994,
+                                1538,
+                                2005
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        }
+                    },
+                    {
+                        "No.": {
+                            "value": "14",
+                            "position": [
+                                144,
+                                2025,
+                                161,
+                                2037
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Transition": {
+                            "value": "1-15",
+                            "position": [
+                                220,
+                                2025,
+                                257,
+                                2037
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "\u03bbair (\u00c5)": {
+                            "value": "",
+                            "position": [
+                                293,
+                                2014,
+                                399,
+                                2044
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Avac (\u00c5) or \u03c3 (cm)a": {
+                            "value": "915.821",
+                            "position": [
+                                466,
+                                2023,
+                                527,
+                                2039
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "E (cm-\u00b9)": {
+                            "value": "0.000",
+                            "position": [
+                                618,
+                                2024,
+                                662,
+                                2038
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Ek (cm\u00b9)": {
+                            "value": "109 191.586",
+                            "position": [
+                                699,
+                                2023,
+                                796,
+                                2040
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "8i-8k": {
+                            "value": "2-450",
+                            "position": [
+                                842,
+                                2025,
+                                891,
+                                2038
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Aki (108 s-1)": {
+                            "value": "1.6572e-04",
+                            "position": [
+                                941,
+                                2025,
+                                1037,
+                                2037
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "fik": {
+                            "value": "4.6886e-04",
+                            "position": [
+                                1066,
+                                2025,
+                                1165,
+                                2038
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "S (a.u.)": {
+                            "value": "2.8272e-03",
+                            "position": [
+                                1196,
+                                2023,
+                                1291,
+                                2038
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "log gf": {
+                            "value": "-3.027 93",
+                            "position": [
+                                1322,
+                                2024,
+                                1401,
+                                2038
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Acc.": {
+                            "value": "AAA",
+                            "position": [
+                                1432,
+                                2026,
+                                1475,
+                                2038
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Source": {
+                            "value": "4",
+                            "position": [
+                                1528,
+                                2026,
+                                1538,
+                                2037
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        }
+                    }
+                ],
+                "Table 1": [
+                    {
+                        "Wave number (cm)": {
+                            "value": "1 810.171",
+                            "position": [
+                                1005,
+                                337,
+                                1090,
+                                355
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Multiplet No.": {
+                            "value": "148",
+                            "position": [
+                                1383,
+                                339,
+                                1414,
+                                353
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        }
+                    },
+                    {
+                        "Wave number (cm)": {
+                            "value": "1 859.092",
+                            "position": [
+                                1004,
+                                369,
+                                1090,
+                                384
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Multiplet No.": {
+                            "value": "149",
+                            "position": [
+                                1383,
+                                369,
+                                1413,
+                                383
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        }
+                    },
+                    {
+                        "Wave number (cm)": {
+                            "value": "1 900.088",
+                            "position": [
+                                1004,
+                                400,
+                                1089,
+                                415
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Multiplet No.": {
+                            "value": "150",
+                            "position": [
+                                1383,
+                                401,
+                                1415,
+                                416
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        }
+                    },
+                    {
+                        "Wave number (cm)": {
+                            "value": "1 934.783",
+                            "position": [
+                                1005,
+                                429,
+                                1091,
+                                447
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Multiplet No.": {
+                            "value": "151",
+                            "position": [
+                                1383,
+                                432,
+                                1413,
+                                445
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        }
+                    },
+                    {
+                        "Wave number (cm)": {
+                            "value": "1 950.108",
+                            "position": [
+                                1005,
+                                461,
+                                1089,
+                                475
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Multiplet No.": {
+                            "value": "129",
+                            "position": [
+                                1383,
+                                461,
+                                1414,
+                                475
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        }
+                    },
+                    {
+                        "Wave number (cm)": {
+                            "value": "1 964.405",
+                            "position": [
+                                1005,
+                                491,
+                                1091,
+                                508
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Multiplet No.": {
+                            "value": "152",
+                            "position": [
+                                1383,
+                                493,
+                                1414,
+                                507
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        }
+                    }
+                ],
+                "Table 4": [
+                    {
+                        "Transition": {
+                            "value": "La",
+                            "position": [
+                                137,
+                                1318,
+                                164,
+                                1341
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Column 02": {
+                            "value": "1-2",
+                            "position": [
+                                295,
+                                1320,
+                                327,
+                                1334
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "\u03bb (nm)": {
+                            "value": "121.523",
+                            "position": [
+                                1271,
+                                1318,
+                                1340,
+                                1335
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Hydrogen Anonrel": {
+                            "value": "4.699",
+                            "position": [
+                                572,
+                                1320,
+                                622,
+                                1335
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "A relativistic": {
+                            "value": "4.6986",
+                            "position": [
+                                743,
+                                1320,
+                                807,
+                                1335
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Deuterium A relativistic": {
+                            "value": "4.6999",
+                            "position": [
+                                1084,
+                                1320,
+                                1146,
+                                1335
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Tritium A relativistic": {
+                            "value": "4.7004",
+                            "position": [
+                                1425,
+                                1318,
+                                1487,
+                                1335
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        }
+                    },
+                    {
+                        "Transition": {
+                            "value": "LB",
+                            "position": [
+                                137,
+                                1349,
+                                165,
+                                1372
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Column 02": {
+                            "value": "1-3",
+                            "position": [
+                                296,
+                                1350,
+                                328,
+                                1364
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "\u03bb (nm)": {
+                            "value": "102.535",
+                            "position": [
+                                1271,
+                                1349,
+                                1341,
+                                1365
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Hydrogen Anonrel": {
+                            "value": "5.575e-1",
+                            "position": [
+                                572,
+                                1350,
+                                659,
+                                1365
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "A relativistic": {
+                            "value": "5.5751e-1",
+                            "position": [
+                                744,
+                                1350,
+                                843,
+                                1365
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Deuterium A relativistic": {
+                            "value": "5.5766e-1",
+                            "position": [
+                                1085,
+                                1350,
+                                1185,
+                                1365
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Tritium A relativistic": {
+                            "value": "5.5771e-1",
+                            "position": [
+                                1426,
+                                1350,
+                                1525,
+                                1365
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        }
+                    },
+                    {
+                        "Transition": {
+                            "value": "Ha",
+                            "position": [
+                                137,
+                                1379,
+                                169,
+                                1401
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Column 02": {
+                            "value": "2-3",
+                            "position": [
+                                293,
+                                1381,
+                                328,
+                                1395
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "\u03bb (nm)": {
+                            "value": "656.23",
+                            "position": [
+                                1270,
+                                1381,
+                                1331,
+                                1396
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Hydrogen Anonrel": {
+                            "value": "4.410e-1",
+                            "position": [
+                                571,
+                                1380,
+                                659,
+                                1396
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "A relativistic": {
+                            "value": "4.4101e-1",
+                            "position": [
+                                743,
+                                1381,
+                                843,
+                                1396
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Deuterium A relativistic": {
+                            "value": "4.4113e-1",
+                            "position": [
+                                1085,
+                                1381,
+                                1184,
+                                1396
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Tritium A relativistic": {
+                            "value": "4.4117e-1",
+                            "position": [
+                                1425,
+                                1380,
+                                1525,
+                                1396
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        }
+                    },
+                    {
+                        "Transition": {
+                            "value": "HB",
+                            "position": [
+                                138,
+                                1410,
+                                169,
+                                1436
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Column 02": {
+                            "value": "2-4",
+                            "position": [
+                                293,
+                                1413,
+                                328,
+                                1426
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "\u03bb (nm)": {
+                            "value": "486.09",
+                            "position": [
+                                1269,
+                                1411,
+                                1328,
+                                1426
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Hydrogen Anonrel": {
+                            "value": "8.419e-2",
+                            "position": [
+                                572,
+                                1412,
+                                661,
+                                1426
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "A relativistic": {
+                            "value": "8.4193e-1",
+                            "position": [
+                                745,
+                                1412,
+                                844,
+                                1426
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Deuterium A relativistic": {
+                            "value": "8.4216e-2",
+                            "position": [
+                                1086,
+                                1412,
+                                1185,
+                                1427
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Tritium A relativistic": {
+                            "value": "8.4224e-2",
+                            "position": [
+                                1427,
+                                1413,
+                                1525,
+                                1427
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        }
+                    }
+                ],
+                "Table 3": [
+                    {
+                        "Transition": {
+                            "value": "1s-2p",
+                            "position": [
+                                140,
+                                802,
+                                199,
+                                823
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Nonrelativistic value Green et al.\u2079 9": {
+                            "value": "6.265",
+                            "position": [
+                                538,
+                                803,
+                                589,
+                                818
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Baker": {
+                            "value": "6.264 9",
+                            "position": [
+                                824,
+                                802,
+                                889,
+                                819
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Relativistic values Jitrik and Bunge": {
+                            "value": "",
+                            "position": [
+                                1008,
+                                785,
+                                1278,
+                                824
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "17 Pal'chikov": {
+                            "value": "",
+                            "position": [
+                                1278,
+                                785,
+                                1563,
+                                824
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        }
+                    },
+                    {
+                        "Transition": {
+                            "value": "1s-2p1/2",
+                            "position": [
+                                140,
+                                827,
+                                220,
+                                850
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Nonrelativistic value Green et al.\u2079 9": {
+                            "value": "",
+                            "position": [
+                                408,
+                                824,
+                                729,
+                                849
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Baker": {
+                            "value": "6.264 9",
+                            "position": [
+                                823,
+                                829,
+                                889,
+                                843
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Relativistic values Jitrik and Bunge": {
+                            "value": "6.264 9",
+                            "position": [
+                                1093,
+                                829,
+                                1158,
+                                844
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "17 Pal'chikov": {
+                            "value": "6.264 9",
+                            "position": [
+                                1380,
+                                829,
+                                1445,
+                                843
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        }
+                    },
+                    {
+                        "Transition": {
+                            "value": "1s-2P3/2",
+                            "position": [
+                                140,
+                                851,
+                                220,
+                                876
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Nonrelativistic value Green et al.\u2079 9": {
+                            "value": "",
+                            "position": [
+                                408,
+                                849,
+                                729,
+                                884
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Baker": {
+                            "value": "6.264 8",
+                            "position": [
+                                824,
+                                855,
+                                889,
+                                868
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Relativistic values Jitrik and Bunge": {
+                            "value": "6.264 8",
+                            "position": [
+                                1093,
+                                852,
+                                1158,
+                                868
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "17 Pal'chikov": {
+                            "value": "6.264 8",
+                            "position": [
+                                1380,
+                                854,
+                                1445,
+                                868
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        }
+                    },
+                    {
+                        "Transition": {
+                            "value": "1s-3p",
+                            "position": [
+                                139,
+                                899,
+                                199,
+                                923
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Nonrelativistic value Green et al.\u2079 9": {
+                            "value": "1.672",
+                            "position": [
+                                540,
+                                905,
+                                587,
+                                919
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Baker": {
+                            "value": "1.672 5",
+                            "position": [
+                                824,
+                                903,
+                                888,
+                                920
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Relativistic values Jitrik and Bunge": {
+                            "value": "",
+                            "position": [
+                                1008,
+                                884,
+                                1278,
+                                924
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "17 Pal'chikov": {
+                            "value": "",
+                            "position": [
+                                1278,
+                                884,
+                                1563,
+                                924
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        }
+                    },
+                    {
+                        "Transition": {
+                            "value": "1s-3p1/2",
+                            "position": [
+                                140,
+                                927,
+                                221,
+                                950
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Nonrelativistic value Green et al.\u2079 9": {
+                            "value": "",
+                            "position": [
+                                408,
+                                924,
+                                729,
+                                950
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Baker": {
+                            "value": "1.672 5",
+                            "position": [
+                                824,
+                                927,
+                                888,
+                                944
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Relativistic values Jitrik and Bunge": {
+                            "value": "1.672 5",
+                            "position": [
+                                1094,
+                                928,
+                                1159,
+                                945
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "17 Pal'chikov": {
+                            "value": "1.672 5",
+                            "position": [
+                                1381,
+                                928,
+                                1444,
+                                945
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        }
+                    },
+                    {
+                        "Transition": {
+                            "value": "1s-3P3/2",
+                            "position": [
+                                140,
+                                952,
+                                221,
+                                975
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Nonrelativistic value Green et al.\u2079 9": {
+                            "value": "",
+                            "position": [
+                                408,
+                                950,
+                                729,
+                                985
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Baker": {
+                            "value": "1.672 5",
+                            "position": [
+                                825,
+                                952,
+                                888,
+                                969
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Relativistic values Jitrik and Bunge": {
+                            "value": "1.672 5",
+                            "position": [
+                                1095,
+                                954,
+                                1160,
+                                969
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "17 Pal'chikov": {
+                            "value": "1.672 5",
+                            "position": [
+                                1382,
+                                954,
+                                1445,
+                                969
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        }
+                    },
+                    {
+                        "Transition": {
+                            "value": "1s-4p",
+                            "position": [
+                                140,
+                                1001,
+                                200,
+                                1024
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Nonrelativistic value Green et al.\u2079 9": {
+                            "value": "0.6818",
+                            "position": [
+                                538,
+                                1004,
+                                599,
+                                1019
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Baker": {
+                            "value": "0.681 86",
+                            "position": [
+                                823,
+                                1003,
+                                900,
+                                1019
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Relativistic values Jitrik and Bunge": {
+                            "value": "",
+                            "position": [
+                                1008,
+                                985,
+                                1278,
+                                1026
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "17 Pal'chikov": {
+                            "value": "",
+                            "position": [
+                                1278,
+                                985,
+                                1563,
+                                1026
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        }
+                    },
+                    {
+                        "Transition": {
+                            "value": "1s-4p1/2",
+                            "position": [
+                                140,
+                                1028,
+                                220,
+                                1051
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Nonrelativistic value Green et al.\u2079 9": {
+                            "value": "",
+                            "position": [
+                                408,
+                                1026,
+                                729,
+                                1051
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Baker": {
+                            "value": "0.681 86",
+                            "position": [
+                                823,
+                                1030,
+                                902,
+                                1045
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Relativistic values Jitrik and Bunge": {
+                            "value": "0.681 86",
+                            "position": [
+                                1092,
+                                1029,
+                                1170,
+                                1045
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "17 Pal'chikov": {
+                            "value": "0.681 86",
+                            "position": [
+                                1379,
+                                1030,
+                                1457,
+                                1045
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        }
+                    },
+                    {
+                        "Transition": {
+                            "value": "1s-4P3/2",
+                            "position": [
+                                140,
+                                1051,
+                                221,
+                                1076
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Nonrelativistic value Green et al.\u2079 9": {
+                            "value": "",
+                            "position": [
+                                408,
+                                1051,
+                                729,
+                                1094
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Baker": {
+                            "value": "0.681 86",
+                            "position": [
+                                823,
+                                1054,
+                                899,
+                                1070
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Relativistic values Jitrik and Bunge": {
+                            "value": "0.681 86",
+                            "position": [
+                                1092,
+                                1055,
+                                1171,
+                                1069
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "17 Pal'chikov": {
+                            "value": "0.681 86",
+                            "position": [
+                                1379,
+                                1055,
+                                1456,
+                                1069
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        }
+                    }
+                ],
+                "Table 2": [
+                    {
+                        "Wave number (cm\u00b9)": {
+                            "value": "1 409.897",
+                            "position": [
+                                268,
+                                337,
+                                353,
+                                354
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Multiplet No.": {
+                            "value": "163",
+                            "position": [
+                                646,
+                                336,
+                                678,
+                                354
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        }
+                    },
+                    {
+                        "Wave number (cm\u00b9)": {
+                            "value": "1 439.519",
+                            "position": [
+                                269,
+                                367,
+                                353,
+                                384
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Multiplet No.": {
+                            "value": "164",
+                            "position": [
+                                647,
+                                369,
+                                677,
+                                383
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        }
+                    },
+                    {
+                        "Wave number (cm\u00b9)": {
+                            "value": "1 476.949",
+                            "position": [
+                                269,
+                                398,
+                                354,
+                                416
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Multiplet No.": {
+                            "value": "144",
+                            "position": [
+                                647,
+                                400,
+                                678,
+                                415
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        }
+                    },
+                    {
+                        "Wave number (cm\u00b9)": {
+                            "value": "1 589.619",
+                            "position": [
+                                269,
+                                431,
+                                354,
+                                446
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Multiplet No.": {
+                            "value": "145",
+                            "position": [
+                                647,
+                                431,
+                                678,
+                                445
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        }
+                    },
+                    {
+                        "Wave number (cm\u00b9)": {
+                            "value": "1 679.020",
+                            "position": [
+                                269,
+                                461,
+                                355,
+                                477
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Multiplet No.": {
+                            "value": "146",
+                            "position": [
+                                647,
+                                461,
+                                678,
+                                475
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        }
+                    },
+                    {
+                        "Wave number (cm\u00b9)": {
+                            "value": "1 692.839",
+                            "position": [
+                                269,
+                                492,
+                                355,
+                                506
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Multiplet No.": {
+                            "value": "128",
+                            "position": [
+                                647,
+                                491,
+                                677,
+                                506
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        }
+                    },
+                    {
+                        "Wave number (cm\u00b9)": {
+                            "value": "1 751.143",
+                            "position": [
+                                269,
+                                522,
+                                354,
+                                537
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        },
+                        "Multiplet No.": {
+                            "value": "147",
+                            "position": [
+                                647,
+                                522,
+                                677,
+                                536
+                            ],
+                            "confidence": 0,
+                            "review_required": true
+                        }
+                    }
+                ]
+            }
+        }
+    }
+]
