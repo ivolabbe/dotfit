@@ -8,7 +8,8 @@ import astropy.units as u
 import pandas as pd
 
 PACKAGE_DIR = Path(__file__).resolve().parent
-DEFAULT_EMISSION_LINES_FILE = PACKAGE_DIR / "data" / "emission_lines/emission_lines.csv"
+DATA_DIR = PACKAGE_DIR / "data" / "emission_lines"
+DEFAULT_EMISSION_LINES_FILE = 'emission_lines.csv'
 
 LINE_GROUPS = {
     # Common doublets/multiplets
@@ -45,9 +46,15 @@ LINE_GROUPS = {
 
 
 class EmissionLines:
-    def __init__(self, filename: str | Path | None = None):
-        if filename is None:
-            filename = DEFAULT_EMISSION_LINES_FILE
+    def __init__(
+        self,
+        filename: str | Path | None = DEFAULT_EMISSION_LINES_FILE,
+        datadir: str | Path | None = DATA_DIR,
+    ):
+        if not Path(filename).exists():
+            filename = Path(datadir) / filename
+
+        self.datadir = Path(filename).parent
 
         self.filename = Path(filename)
         self.table = Table.read(self.filename)
@@ -59,12 +66,22 @@ class EmissionLines:
     # use get_line_nist to add new row
     # def get_line_nist(ion='H I', wave=[4000,6600], tolerance=1.0, single=False,
     #                  sortkey='Aki', clear_cache=True, verbose=False):
-    def add_line(self, ion, **kwargs):
-        self.table = vstack([self.table, get_line_nist(ion='H I', **kwargs)])
-        self.table.sort('wave_vac')
+    # def add_line(self, ion, **kwargs):
+    #     self.table = vstack([self.table, get_line_nist(ion='H I', **kwargs)])
+    #     self.table.sort('wave_vac')
 
-    def search_line_nist(self, ion, **kwargs):
+    # static
+    @staticmethod
+    def search_line_nist(ion, **kwargs):
         return get_line_nist(ion=ion, **kwargs)
+
+    @staticmethod
+    def list():
+        """List contents of the emission-lines data directory."""
+        datadir = Path(DATA_DIR)
+        if not datadir.exists():
+            return []
+        return sorted(p.name for p in datadir.iterdir())
 
     def remove_key(self, key):
         ix_remove = np.where(self.table['key'] != key)[0]
@@ -117,14 +134,15 @@ class EmissionLines:
 
         # Get all lines for this ion to correctly assign multiplets
         ion_tab = self.table[self.table['ion'] == ion]
-
         # Assign multiplets (this returns a copy/subset with 'multiplet' column populated)
-        ion_tab = assign_multiplets(ion_tab)
+        # should have already been populated, dont redo implicitly
+        # ion_tab = assign_multiplets(ion_tab)
 
         # Find the multiplet ID for the requested key
         match = ion_tab['key'] == key
-        if np.sum(match) == 0:
-            return None
+        # this should be true by definition
+        #        if np.sum(match) == 0:
+        #            return None
 
         m_id = ion_tab['multiplet'][match][0]
 
@@ -588,6 +606,336 @@ class EmissionLines:
         return unite_dict
 
 
+def read_kurucz_table(
+    path: str | Path,
+    ion_override: str | None = None,
+    ndigits: int = 3,
+    assign_multiplet: bool = True,
+    emissivities: bool = True,
+    Te: float = 10_000,
+):
+    """
+    Read a Kurucz fixed-width line list file into the dotfit emission line table format.
+
+    The Kurucz format uses fixed-width columns with the following layout:
+        Wl_vac      Wl_air   log_gf   A-Value   Elem. Element E_lower_lev.   J   Config.    E_upper_lev.   J   Config.    Ref.
+
+    Parameters
+    ----------
+    path : str or Path
+        Path to the Kurucz file.
+    ion_override : str, optional
+        If provided, use this ion string for all rows (e.g. "Fe II").
+    ndigits : int
+        Rounding digits for wavelengths in Angstrom.
+    assign_multiplet : bool
+        If True, assign multiplets using configuration/terms.
+    emissivities : bool
+        If True, compute multiplet emissivity ratios (line_ratio) when possible.
+    Te : float
+        Electron temperature [K] for emissivity ratios.
+
+    Returns
+    -------
+    astropy.table.Table
+        Table with columns compatible with dotfit emission line tables.
+    """
+    path = Path(path)
+    lines = path.read_text(encoding="utf-8", errors="ignore").splitlines()
+
+    # Verify header is present
+    header_found = False
+    for line in lines:
+        if "Wl_vac" in line and "Wl_air" in line and "log_gf" in line:
+            header_found = True
+            break
+
+    if not header_found:
+        raise ValueError("Kurucz header line not found; expected 'Wl_vac' and 'log_gf'.")
+
+    # Fixed-width column specifications for the Kurucz format
+    # These are determined empirically from the data layout, NOT from header positions
+    # Column positions: (start, end) - 0-indexed, end is exclusive
+    colspecs = [
+        (0, 12),  # Wl_vac (nm)
+        (12, 24),  # Wl_air (nm, may be blank for vacuum UV)
+        (24, 31),  # log_gf
+        (31, 42),  # A-Value (1/s)
+        (42, 48),  # Elem. code (e.g., 26.01)
+        (48, 60),  # Element name (e.g., "Fe II")
+        (60, 72),  # E_lower_lev. (eV)
+        (72, 76),  # J_lower
+        (76, 88),  # Config. lower (orbital config + term)
+        (88, 100),  # E_upper_lev. (eV)
+        (100, 106),  # J_upper
+        (106, 117),  # Config. upper (orbital config + term)
+        (117, None),  # Ref.
+    ]
+
+    def _slice(line: str, start: int, end: int | None) -> str:
+        return line[start:end].strip() if end is not None else line[start:].strip()
+
+    def _j_to_fraction(j_val: float) -> str:
+        """Convert J value like 4.5 to '9/2' fractional format."""
+        if np.isnan(j_val):
+            return ""
+        # If J is integer, return as integer string
+        if j_val == int(j_val):
+            return str(int(j_val))
+        # Otherwise, convert to fraction: 4.5 -> 9/2
+        numerator = int(2 * j_val)
+        return f"{numerator}/2"
+
+    def _parse_config_term(cfg_str: str) -> tuple[str, str]:
+        """Parse Kurucz config string into configuration and term parts.
+
+        Examples:
+            "(5D)4s a6D" -> config="(5D)4s", term="a6D"
+            "d7 a4F" -> config="d7", term="a4F"
+            "(3F2)5p 4F" -> config="(3F2)5p", term="4F"
+        """
+        cfg_str = cfg_str.strip()
+        if not cfg_str:
+            return "", ""
+
+        parts = cfg_str.split()
+        if len(parts) == 1:
+            # Check if it matches term pattern: [a-z prefix]digit+L[*]
+            if re.match(r'^[a-z]?\d+[SPDFGHIKLMN](\*)?$', parts[0]):
+                return "", parts[0]
+            return parts[0], ""
+
+        # Multiple parts - last part is typically the term
+        term = parts[-1]
+        config = " ".join(parts[:-1])
+        return config, term
+
+    records = []
+    for line in lines:
+        if not line.strip() or line.lstrip().startswith("-"):
+            continue
+        if "Wl_vac" in line or "/ nm" in line:
+            continue
+
+        fields = [_slice(line, s, e) for (s, e) in colspecs]
+        if not fields[0]:
+            continue
+
+        try:
+            wl_vac_nm = float(fields[0])
+        except ValueError:
+            continue
+
+        wl_air_nm = None
+        if fields[1]:
+            try:
+                wl_air_nm = float(fields[1])
+            except ValueError:
+                wl_air_nm = None
+
+        try:
+            log_gf = float(fields[2])
+        except ValueError:
+            log_gf = np.nan
+
+        try:
+            A_value = float(fields[3])
+        except ValueError:
+            A_value = np.nan
+
+        elem_name = fields[5] or ""
+        ion = ion_override or elem_name
+
+        try:
+            E_lower = float(fields[6])
+        except ValueError:
+            E_lower = np.nan
+
+        try:
+            J_lower = float(fields[7])
+        except ValueError:
+            J_lower = np.nan
+
+        cfg_lower_full = fields[8] or ""
+
+        try:
+            E_upper = float(fields[9])
+        except ValueError:
+            E_upper = np.nan
+
+        try:
+            J_upper = float(fields[10])
+        except ValueError:
+            J_upper = np.nan
+
+        cfg_upper_full = fields[11] or ""
+        ref = fields[12] or ""
+
+        # Convert wavelength from nm to Angstrom
+        wl_vac = np.round(wl_vac_nm * 10.0, ndigits)
+        if wl_air_nm is None:
+            wl_air = np.round(vacuum_to_air(wl_vac), ndigits)
+        else:
+            wl_air = np.round(wl_air_nm * 10.0, ndigits)
+
+        # Parse configuration and term from Kurucz format
+        lower_config, lower_term = _parse_config_term(cfg_lower_full)
+        upper_config, upper_term = _parse_config_term(cfg_upper_full)
+
+        terms = f"{lower_term}-{upper_term}" if lower_term and upper_term else "--"
+
+        # Build configuration string: use only electron configuration parts
+        # Remove spaces inside each side so e.g. 'd5 4s2' -> 'd54s2'
+        def _compact_cfg(cfg: str) -> str:
+            return cfg.replace(" ", "") if cfg else ""
+
+        lc = _compact_cfg(lower_config)
+        uc = _compact_cfg(upper_config)
+
+        if lc and uc:
+            configuration = f"{lc}-{uc}"
+        elif lc:
+            configuration = lc
+        elif uc:
+            configuration = uc
+        else:
+            configuration = ""
+
+        # Format J values as fractions (e.g., "9/2-9/2")
+        j_lower_str = _j_to_fraction(J_lower)
+        j_upper_str = _j_to_fraction(J_upper)
+        ji_jk = f"{j_lower_str}-{j_upper_str}" if j_lower_str and j_upper_str else "--"
+
+        # Calculate statistical weights (g = 2J + 1)
+        if np.isnan(J_lower) or np.isnan(J_upper):
+            gigk = ""
+            gi = 0
+        else:
+            gi = int(round(2 * J_lower + 1))
+            gk = int(round(2 * J_upper + 1))
+            gigk = f"{gi}-{gk}"
+
+        gf = 10 ** log_gf if np.isfinite(log_gf) else 0.0
+        fik = gf / gi if (gi > 0) else 0.0
+
+        try:
+            classification = classify_transition(
+                configuration, terms, ji_jk, nist_type="E1", Aki=A_value, fik=fik
+            )
+        except Exception:
+            classification = "permitted"
+
+        # Adjust key and ion depending on classification:
+        # permitted: key 'FeII-XXXX', ion 'Fe II'
+        # semi-forbidden: key 'FeII]-XXXX', ion 'Fe II]'
+        # forbidden: key '[FeII]-XXXX', ion '[Fe II]'
+        ion_plain = ion  # e.g. 'Fe II'
+        ion_nospace = replace_greek(ion_plain, tex=False).replace(" ", "")  # 'FeII'
+
+        if classification == "permitted":
+            key = f"{ion_nospace}-{wl_vac:.0f}"
+            ion_out = ion_plain
+        elif classification == "semi-forbidden":
+            # Use closing bracket style for semi-forbidden
+            key = f"{ion_nospace}]-{wl_vac:.0f}"
+            ion_out = ion_plain + "]"
+        elif classification == "forbidden":
+            key = f"[{ion_nospace}]-{wl_vac:.0f}"
+            ion_out = f"[{ion_plain}]"
+        else:
+            key = f"{ion_nospace}-{wl_vac:.0f}"
+            ion_out = ion_plain
+
+        # Build ion_tex from the possibly bracketed ion_out
+        ion_tex = replace_greek(replace_brackets_with_dollars(ion_out))
+        ion_tex_lambda = (ion_tex + r"$\,\lambda" + f"{wl_vac:.0f}$").replace("$$", "")
+        if classification == "semi-forbidden":
+            ion_out = ion_out.replace("]", '')  # loose the ] in ion for semi-forbidden
+
+        records.append(
+            (
+                key,
+                ion_out,
+                wl_vac,
+                E_lower,
+                E_upper,
+                A_value,
+                fik,
+                gigk,
+                configuration,
+                terms,
+                ji_jk,
+                "E1",
+                ref,
+                "--",
+                wl_air,
+                ion_tex,
+                ion_tex_lambda,
+                classification,
+                gf,
+                0,
+                1.0,
+            )
+        )
+
+    tab = Table(
+        rows=records,
+        names=[
+            "key",
+            "ion",
+            "wave_vac",
+            "Ei",
+            "Ek",
+            "Aki",
+            "fik",
+            "gigk",
+            "configuration",
+            "terms",
+            "Ji-Jk",
+            "type",
+            "references",
+            "note",
+            "wave_air",
+            "ion_tex",
+            "ion_tex_lambda",
+            "classification",
+            "gf",
+            "multiplet",
+            "line_ratio",
+        ],
+        dtype=[
+            "U14",
+            "U9",
+            "float64",
+            "float64",
+            "float64",
+            "float64",
+            "float64",
+            "U8",
+            "U37",
+            "U14",
+            "U9",
+            "U2",
+            "U14",
+            "U10",
+            "float64",
+            "U13",
+            "U27",
+            "U27",
+            "float64",
+            "int64",
+            "float64",
+        ],
+    )
+
+    if assign_multiplet and len(tab) > 0:
+        tab = assign_multiplets(tab)
+        if emissivities:
+            tab = calculate_multiplet_emissivities(tab, Te=Te)
+
+    return tab
+
+
 # Backwards compatible alias with the legacy implementation name.
 # Emission_Lines = EmissionLines
 
@@ -718,7 +1066,7 @@ def construct_hydrogen_key(config):
     return None
 
 
-def classify_transition(config, terms, Ji_Jk, nist_type=None, Aki=None, fik=None):
+def classify_transition(config, terms, Ji_Jk, nist_type=None, Aki=None, fik=None, verbose=False):
     """
     Classify a transition as forbidden, semi-forbidden, or permitted.
     Uses NIST type classification when available, with numerical overrides.
@@ -817,6 +1165,14 @@ def classify_transition(config, terms, Ji_Jk, nist_type=None, Aki=None, fik=None
     nist_type = (nist_type or "").strip()
     if nist_type == "--":
         nist_type = "E1"
+
+    if verbose:
+        print(
+            f"Classifying transition: {config}, {terms}, {Ji_Jk}, NIST type: {nist_type}, Aki: {Aki}, fik: {fik}"
+        )
+        print(
+            f"  Lower parity: {lower_parity}, Upper parity: {upper_parity}, ΔS: {delta_S}, ΔL: {delta_L}, ΔJ: {delta_J}"
+        )
 
     # 0) If NIST explicitly labels a forbidden multipole, respect it
     if nist_type in {"M1", "E2", "M2", "E3"}:
@@ -977,12 +1333,32 @@ def get_line_nist(
             else:
                 raise ValueError(f"Invalid level format: {level}")
 
-        # Parse Ei and Ek
-        if is_masked_or_nan(row['EiEk']):
+        # Parse Ei and Ek (be defensive: values may have trailing letters like 'u' or flags)
+        if is_masked_or_nan(row.get('EiEk', None)):
             continue
-        energy_levels = row['EiEk'].split('-')
-        Ei = float(energy_levels[0].strip().strip('[]').strip('()'))
-        Ek = float(energy_levels[1].strip().strip('[]').strip('()'))
+        # split on hyphen with optional spaces
+        energy_levels = re.split(r"\s*-\s*", str(row['EiEk']))
+        if len(energy_levels) < 2:
+            continue
+
+        def _extract_float(s: str) -> float:
+            """Extract first floating-point number from string s, or return NaN."""
+            if s is None:
+                return np.nan
+            s = str(s)
+            m = re.search(r"[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?", s)
+            if not m:
+                return np.nan
+            try:
+                return float(m.group())
+            except Exception:
+                return np.nan
+
+        Ei = _extract_float(energy_levels[0].strip().strip('[]').strip('()'))
+        Ek = _extract_float(energy_levels[1].strip().strip('[]').strip('()'))
+        if not np.isfinite(Ei) or not np.isfinite(Ek):
+            # skip entries with non-numeric energy levels
+            continue
 
         # Handle NIST type
         nist_type = 'E1' if str(row['Type']) == '--' else str(row['Type'])
@@ -1032,6 +1408,11 @@ def get_line_nist(
 
         ion_tex = ion_tab.replace(']', '$]$').replace('[', '$[$')
 
+        # use of 'ion' is not entirely consistent here: ion is both ion + transition type
+        # use same ion code for semi-forbidden as for permitted, for assign_multiplets etc
+        if cval == 'semi-forbidden':
+            ion_tab = ion_tab.replace(']', '')
+
         if ion == 'H I':
             ion_tex = ion_tex[:-1] + replace_with_latex(ion_tex[-1])
 
@@ -1072,7 +1453,7 @@ def get_line_nist(
     if len(output) > 0:
         gf = np.full(len(output), np.nan)
         for i, (gi, fik) in enumerate(output['gigk', 'fik']):
-            if ma.is_masked(gi) or ma.is_masked(fik):
+            if ma.is_masked(gi) or ma.is_masked(fik) or gi == '':
                 continue
             gf[i] = float(gi.split('-')[0]) * fik
 
@@ -1223,7 +1604,7 @@ def hydrogen_ratios(intab, wave=[2000, 1e5], Te=1e4, Ne=1e2, tolerance=1.0):
     return tab
 
 
-def assign_multiplets(tab, verbose=False, lower_only=False):
+def assign_multiplets(intab, verbose=False, lower_only=False):
     """
     Assign multiplet numbers to transitions with the same configuration and term multiplicity.
     Multiplet numbers are unique within each ion, not globally.
@@ -1236,6 +1617,7 @@ def assign_multiplets(tab, verbose=False, lower_only=False):
     Returns:
         Table with added 'multiplet' and 'multiplet_key' columns
     """
+    tab = intab.copy()
     if 'configuration' not in tab.colnames:
         tab['configuration'] = [''] * len(tab)
 
@@ -1249,7 +1631,8 @@ def assign_multiplets(tab, verbose=False, lower_only=False):
 
     if lower_only:
         # Group by lower term only (extract before the '-')
-        multiplet_keys = [
+        # @@@ do we need the full configuration here? or just the term? Sometimes terms are abbreviated eg 6P
+        multiplet_term = [
             (
                 c
                 if isinstance(t, np.ma.core.MaskedConstant)
@@ -1259,22 +1642,21 @@ def assign_multiplets(tab, verbose=False, lower_only=False):
         ]
     else:
         # Group by full configuration and term (both lower and upper)
-        multiplet_keys = [
+        multiplet_term = [
             (c if isinstance(t, np.ma.core.MaskedConstant) else c + '_' + t.strip())
             for c, t in zip(tab['configuration'], tab['terms'])
         ]
 
-    tab['multiplet_key'] = multiplet_keys
-
+    tab['multiplet_term'] = multiplet_term
     if verbose:
-        print('multiplet_key', ' -- ', tab['multiplet_key'])
+        print('multiplet_term', ' -- ', tab['multiplet_term'])
 
     # Group by ion first, then assign multiplets within each ion
     ion_groups = tab.group_by('ion')
 
     for ion_group in ion_groups.groups:
-        # Group by multiplet_key within this ion
-        multiplet_groups = ion_group.group_by('multiplet_key')
+        # Group by multiplet_term within this ion
+        multiplet_groups = ion_group.group_by('multiplet_term')
 
         multiplet_index = 1
         for ig, group in enumerate(multiplet_groups.groups):
@@ -1282,7 +1664,7 @@ def assign_multiplets(tab, verbose=False, lower_only=False):
                 if verbose:
                     print(
                         f"Multiplet {multiplet_index}: ion={group['ion'][0]}, "
-                        f"config={group['multiplet_key'][0]} n={len(group['wave_vac'])}"
+                        f"config={group['multiplet_term'][0]} n={len(group['wave_vac'])}"
                     )
 
                 # Get indices in original table
@@ -1293,9 +1675,9 @@ def assign_multiplets(tab, verbose=False, lower_only=False):
                 multiplet_index += 1
             else:
                 if verbose:
-                    print(f"Single line: {group['ion'][0]} {group['multiplet_key'][0]}")
-
-    del tab['multiplet_key']
+                    print(f"Single line: {group['ion'][0]} {group['multiplet_term'][0]}")
+    for t in tab:
+        t['multiplet_term'] = t['multiplet_term'].split('_')[1]
     return tab
 
 
@@ -1446,102 +1828,6 @@ def multiplet_ratios(tab, Te=1e4, Ne=1e2, tolerance=0.1, verbose=False):
 
 #     return grouped_table
 
-# adopted from pyqso
-continuum_windows = [
-    (1150.0, 1170.0),
-    (1275.0, 1290.0),
-    (1350.0, 1360.0),
-    (1445.0, 1465.0),
-    (1690.0, 1705.0),
-    (1770.0, 1810.0),
-    (1970.0, 2400.0),
-    (2480.0, 2675.0),
-    (2925.0, 3400.0),
-    (3775.0, 3832.0),
-    (4000.0, 4050.0),
-    (4200.0, 4230.0),
-    (4435.0, 4640.0),
-    (5100.0, 5535.0),
-    (6005.0, 6035.0),
-    (6110.0, 6250.0),
-    (6800.0, 7000.0),
-    (7160.0, 7180.0),
-    (7500.0, 7800.0),
-    (8050.0, 8150.0),
-]
-
-
-def replace_greek(text, tex=True):
-    # Dictionary mapping Unicode Greek letters to LaTeX representations
-    greek_to_latex = {
-        "α": r"$\alpha$",
-        "β": r"$\beta$",
-        "γ": r"$\gamma$",
-        "δ": r"$\delta$",
-        "ε": r"$\epsilon$",
-        "ζ": r"$\zeta$",
-        "η": r"$\eta$",
-        "θ": r"$\theta$",
-        "ι": r"$\iota$",
-        "κ": r"$\kappa$",
-        "λ": r"$\lambda$",
-        "μ": r"$\mu$",
-        "ν": r"$\nu$",
-        "ξ": r"$\xi$",
-        "ο": r"$o$",
-        "π": r"$\pi$",
-        "ρ": r"$\rho$",
-        "σ": r"$\sigma$",
-        "τ": r"$\tau$",
-        "υ": r"$\upsilon$",
-        "φ": r"$\phi$",
-        "χ": r"$\chi$",
-        "ψ": r"$\psi$",
-        "ω": r"$\omega$",
-        "Α": r"$\Alpha$",
-        "Β": r"$\Beta$",
-        "Γ": r"$\Gamma$",
-        "Δ": r"$\Delta$",
-        "Ε": r"$E$",
-        "Ζ": r"$Z$",
-        "Η": r"$H$",
-        "Θ": r"$\Theta$",
-        "Ι": r"$I$",
-        "Κ": r"$K$",
-        "Λ": r"$\Lambda$",
-        "Μ": r"$M$",
-        "Ν": r"$N$",
-        "Ξ": r"$\Xi$",
-        "Ο": r"$O$",
-        "Π": r"$\Pi$",
-        "Ρ": r"$P$",
-        "Σ": r"$\Sigma$",
-        "Τ": r"$T$",
-        "Υ": r"$\Upsilon$",
-        "Φ": r"$\Phi$",
-        "Χ": r"$X$",
-        "Ψ": r"$Ψ$",
-        "Ω": r"$\Omega$",
-    }
-
-    # Replace each Greek letter in the text
-    if tex:
-        for greek, latex in greek_to_latex.items():
-            text = text.replace(greek, latex)
-    else:
-        for greek, latex in greek_to_latex.items():
-            text = text.replace(greek, '')
-
-    return text
-
-
-def replace_brackets_with_dollars(text):
-    text = text.replace("[", r"$[$")
-    text = text.replace("]", r"$]$")
-    return text.replace('$$', '')
-
-
-from astropy.table import MaskedColumn, Table, vstack
 
 # obsolete get from NIST
 # def hydrogen_lines(
@@ -1897,3 +2183,101 @@ def calculate_multiplet_emissivities(tab, Te=10_000, default=1.0, verbose=False)
             print(f"  Relative intensities: {I_norm}")
 
     return tab
+
+
+# adopted from pyqso
+continuum_windows = [
+    (1150.0, 1170.0),
+    (1275.0, 1290.0),
+    (1350.0, 1360.0),
+    (1445.0, 1465.0),
+    (1690.0, 1705.0),
+    (1770.0, 1810.0),
+    (1970.0, 2400.0),
+    (2480.0, 2675.0),
+    (2925.0, 3400.0),
+    (3775.0, 3832.0),
+    (4000.0, 4050.0),
+    (4200.0, 4230.0),
+    (4435.0, 4640.0),
+    (5100.0, 5535.0),
+    (6005.0, 6035.0),
+    (6110.0, 6250.0),
+    (6800.0, 7000.0),
+    (7160.0, 7180.0),
+    (7500.0, 7800.0),
+    (8050.0, 8150.0),
+]
+
+
+def replace_greek(text, tex=True):
+    # Dictionary mapping Unicode Greek letters to LaTeX representations
+    greek_to_latex = {
+        "α": r"$\alpha$",
+        "β": r"$\beta$",
+        "γ": r"$\gamma$",
+        "δ": r"$\delta$",
+        "ε": r"$\epsilon$",
+        "ζ": r"$\zeta$",
+        "η": r"$\eta$",
+        "θ": r"$\theta$",
+        "ι": r"$\iota$",
+        "κ": r"$\kappa$",
+        "λ": r"$\lambda$",
+        "μ": r"$\mu$",
+        "ν": r"$\nu$",
+        "ξ": r"$\xi$",
+        "ο": r"$o$",
+        "π": r"$\pi$",
+        "ρ": r"$\rho$",
+        "σ": r"$\sigma$",
+        "τ": r"$\tau$",
+        "υ": r"$\upsilon$",
+        "φ": r"$\phi$",
+        "χ": r"$\chi$",
+        "ψ": r"$\psi$",
+        "ω": r"$\omega$",
+        "Α": r"$\Alpha$",
+        "Β": r"$\Beta$",
+        "Γ": r"$\Gamma$",
+        "Δ": r"$\Delta$",
+        "Ε": r"$E$",
+        "Ζ": r"$Z$",
+        "Η": r"$H$",
+        "Θ": r"$\Theta$",
+        "Ι": r"$I$",
+        "Κ": r"$K$",
+        "Λ": r"$\Lambda$",
+        "Μ": r"$M$",
+        "Ν": r"$N$",
+        "Ξ": r"$\Xi$",
+        "Ο": r"$O$",
+        "Π": r"$\Pi$",
+        "Ρ": r"$P$",
+        "Σ": r"$\Sigma$",
+        "Τ": r"$T$",
+        "Υ": r"$\Upsilon$",
+        "Φ": r"$\Phi$",
+        "Χ": r"$X$",
+        "Ψ": r"$Ψ$",
+        "Ω": r"$\Omega$",
+    }
+
+    # Replace each Greek letter in the text
+    if tex:
+        for greek, latex in greek_to_latex.items():
+            text = text.replace(greek, latex)
+    else:
+        for greek, latex in greek_to_latex.items():
+            text = text.replace(greek, '')
+
+    return text
+
+
+def replace_brackets_with_dollars(text):
+    text = text.replace("[", r"$[$")
+    text = text.replace("]", r"$]$")
+    return text.replace('$$', '')
+
+
+from astropy.table import MaskedColumn, Table, vstack
