@@ -1377,6 +1377,7 @@ def read_kurucz_table(
                 gf,
                 0,
                 1.0,
+                "",
                 ref,
                 "--",
             )
@@ -1402,6 +1403,7 @@ def read_kurucz_table(
             "gf",
             "multiplet",
             "line_ratio",
+            "multiplet_term",
             "references",
             "note",
         ],
@@ -1423,6 +1425,7 @@ def read_kurucz_table(
             "float64",
             "int64",
             "float64",
+            "U32",
             "U14",
             "U10",
         ],
@@ -1521,7 +1524,9 @@ def read_sigut_table(path: str | Path) -> Table:
             'wave_air': waves,
             'classification': ['permitted'] * len(waves),
             'gf': [0.0] * len(waves),
+            'multiplet': [0] * len(waves),
             'line_ratio': fluxes,
+            'multiplet_term': [''] * len(waves),
             'references': ['Sigut+03'] * len(waves),
             'note': [''] * len(waves),
         }
@@ -1871,6 +1876,9 @@ def get_line_nist(
             'type',
             'wave_air',
             'classification',
+            'multiplet',
+            'line_ratio',
+            'multiplet_term',
             'references',
             'note',
         ],
@@ -1889,6 +1897,9 @@ def get_line_nist(
             'U2',
             'float64',
             'U27',
+            'int64',
+            'float64',
+            'U32',
             'U14',
             'U10',
         ],
@@ -2027,6 +2038,9 @@ def get_line_nist(
                 out_type,
                 wave_air,
                 cval,
+                0,
+                1.0,
+                '',
                 'NIST',
                 '',
             ]
@@ -2143,8 +2157,14 @@ def emissivity_ratios(atom, level, wave_vac, Te=1e4, Ne=1e2, relative=False, tol
 
     for i, w in enumerate(wave_air):
         # Nearest PyNeb line
-        if verbose:
-            print(atom, level, 'line_waves', line_waves, f'{Te=} {Ne=}')
+        if verbose and i == 0:
+            if line_waves.size > 0:
+                print(
+                    f"{atom} {level} PyNeb lines={len(line_waves)} "
+                    f"range={line_waves.min():.2f}-{line_waves.max():.2f} Te={Te} Ne={Ne}"
+                )
+            else:
+                print(f"{atom} {level} PyNeb lines=0 Te={Te} Ne={Ne}")
         idx = np.argmin(np.abs(line_waves - w))
         dw = abs(line_waves[idx] - w)
 
@@ -2166,7 +2186,7 @@ def emissivity_ratios(atom, level, wave_vac, Te=1e4, Ne=1e2, relative=False, tol
             emissivity[finite] /= emissivity[finite].max()
 
     if verbose:
-        print(f"Theoretical ratio {neb_atom.atom}", wave_vac, emissivity)
+        print(f"Theoretical ratio {neb_atom.atom} n={len(emissivity)}")
     return emissivity
 
 
@@ -2276,7 +2296,15 @@ def assign_multiplets(intab, verbose=False, lower_only=False):
 
 
 def calculate_multiplet_ratio(
-    tab, ion, multiplet_number, Te=1e4, Ne=1e2, tolerance=0.1, default=1.0, verbose=False
+    tab,
+    ion,
+    multiplet_number,
+    Te=1e4,
+    Ne=1e2,
+    tolerance=0.1,
+    default=1.0,
+    verbose=False,
+    return_method=False,
 ):
     """
     Calculate line intensity ratios for a specific multiplet.
@@ -2303,10 +2331,6 @@ def calculate_multiplet_ratio(
     # Extract atom and ionization level
     atom, level = ion.replace('[', '').replace(']', '').split(' ')
 
-    if verbose:
-        print(f"Calculating ratios for {atom} {level} multiplet {multiplet_number}")
-        print(f"Wavelengths: {group['wave_vac']}")
-
     # Calculate emissivity ratios
     try:
         if _should_use_pyneb(ion, group):
@@ -2317,19 +2341,24 @@ def calculate_multiplet_ratio(
                 Te=Te,
                 Ne=Ne,
                 tolerance=tolerance,
-                verbose=verbose,
+                verbose=False,
             )
             # Check if ratios are all NaN or zero (which might happen if PyNeb returns nothing useful)
             if np.all(np.isnan(ratios)) or np.all(ratios == 0):
                 raise ValueError("PyNeb returned no valid emissivities")
+            method = "pyneb"
         else:
             ratios = _boltzmann_ratios_for_group(group, Te=Te, default=default, verbose=verbose)
+            method = "boltzmann"
 
     except Exception as e:
         if verbose:
             print(f"Emissivity calculation failed for {ion}: {e}. Falling back to flat ratios.")
         ratios = np.full(len(group), default)
+        method = "default"
 
+    if return_method:
+        return ratios, method
     return ratios
 
 
@@ -2353,32 +2382,53 @@ def multiplet_ratios(tab, Te=1e4, Ne=1e2, tolerance=0.1, verbose=False):
     # Add line_ratio column if it doesn't exist
     if 'line_ratio' not in tab.colnames:
         tab['line_ratio'] = 0.0
+    if 'line_ratio_method' not in tab.colnames:
+        tab['line_ratio_method'] = np.full(len(tab), '', dtype='U16')
 
     unique_multiplets = np.unique(tab['multiplet'])
     #    unique_multiplets = unique_multiplets[unique_multiplets > 0]
 
-    # Calculate ratios for each multiplet
+    # Calculate ratios for each multiplet, grouped by ion
     for multiplet_num in unique_multiplets:
         if multiplet_num == 0:
             continue
 
-        # Get the ion for this multiplet
-        mask = tab['multiplet'] == multiplet_num
-        ion = tab['ion'][mask][0]
+        multiplet_mask = tab['multiplet'] == multiplet_num
+        ions = np.unique(tab['ion'][multiplet_mask])
 
-        # Calculate ratios
-        ratios = calculate_multiplet_ratio(
-            tab, ion, multiplet_num, Te=Te, Ne=Ne, tolerance=tolerance, verbose=verbose
-        )
+        for ion in ions:
+            mask = multiplet_mask & (tab['ion'] == ion)
+            if not np.any(mask):
+                continue
 
-        if ratios is not None:
-            tab['line_ratio'][mask] = ratios
+            # Calculate ratios
+            ratios, method = calculate_multiplet_ratio(
+                tab,
+                ion,
+                multiplet_num,
+                Te=Te,
+                Ne=Ne,
+                tolerance=tolerance,
+                verbose=verbose,
+                return_method=True,
+            )
+
+            if ratios is not None:
+                tab['line_ratio'][mask] = ratios
+                tab['line_ratio_method'][mask] = method
 
     return tab
 
 
 def apply_multiplet_rules(
-    tab, Te_emission=10_000, Te_absorption=5_000, Ne=1e4, tolerance=0.1, verbose=False, except_keys=None
+    tab,
+    Te_emission=10_000,
+    Te_absorption=5_000,
+    Ne=1e4,
+    tolerance=0.1,
+    verbose=False,
+    except_keys=None,
+    normalize_multiplet=True,
 ):
     """
     Assign multiplets and line ratios using classification-aware rules.
@@ -2421,6 +2471,23 @@ def apply_multiplet_rules(
         abs_tab = calculate_multiplet_emissivities(abs_tab, Te=Te_absorption, verbose=verbose)
         out['line_ratio'][abs_mask] = abs_tab['line_ratio']
 
+    if normalize_multiplet and 'multiplet' in out.colnames and 'line_ratio' in out.colnames:
+        for ion in np.unique(out['ion']):
+            ion_mask = out['ion'] == ion
+            for m in np.unique(out['multiplet'][ion_mask]):
+                if m <= 0:
+                    continue
+                m_mask = ion_mask & (out['multiplet'] == m)
+                ratios = out['line_ratio'][m_mask]
+                if hasattr(ratios, 'mask'):
+                    valid = ~ratios.mask & ~np.isnan(ratios)
+                else:
+                    valid = ~np.isnan(ratios)
+                if np.any(valid):
+                    max_r = np.max(ratios[valid])
+                    if max_r > 0:
+                        out['line_ratio'][m_mask] = ratios / max_r
+
     if except_keys is None:
         except_keys = ['CaII-3935', 'CaII-8500']
 
@@ -2437,6 +2504,29 @@ def apply_multiplet_rules(
                 out['line_ratio'][out['multiplet'] == multiplet_id] = 1.0
             else:
                 out['line_ratio'][key_mask] = 1.0
+
+    if 'references' in out.colnames:
+        out.columns.move_to_end('references')
+    if 'note' in out.colnames:
+        out.columns.move_to_end('note')
+
+    if verbose:
+        has_key = 'key' in out.colnames
+        has_term = 'multiplet_term' in out.colnames
+        has_method = 'line_ratio_method' in out.colnames
+        for row in out:
+            name = row['key'] if has_key else row['ion']
+            term = str(row['multiplet_term']) if has_term else ''
+            method = str(row['line_ratio_method']) if has_method else ''
+            ratio_val = row['line_ratio'] if 'line_ratio' in out.colnames else np.nan
+            if np.ma.is_masked(ratio_val) or np.isnan(ratio_val):
+                ratio_str = 'nan'
+            else:
+                ratio_str = f"{float(ratio_val):.6g}"
+            print(
+                f"{name}, {float(row['wave_vac']):.3f}, m={int(row['multiplet'])}, "
+                f"term={term}, ratio={ratio_str}, method={method}"
+            )
 
     return out
 
@@ -2782,6 +2872,8 @@ def calculate_multiplet_emissivities(tab, Te=10_000, default=1.0, verbose=False)
     # Add line_ratio column if it doesn't exist
     if 'line_ratio' not in tab.colnames:
         tab['line_ratio'] = default
+    if 'line_ratio_method' not in tab.colnames:
+        tab['line_ratio_method'] = np.full(len(tab), '', dtype='U16')
 
     # Extract gi, gu for all rows
     gi_all = []
@@ -2841,6 +2933,7 @@ def calculate_multiplet_emissivities(tab, Te=10_000, default=1.0, verbose=False)
 
         # Assign back to table
         tab['line_ratio'][idx] = I_norm
+        tab['line_ratio_method'][idx] = 'boltzmann'
 
         if verbose:
             print(f"\n{ion} multiplet {multiplet_num}:")
