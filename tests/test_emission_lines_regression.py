@@ -33,6 +33,14 @@ def test_get_multiplet_feii_9217():
     assert np.all(tab["multiplet"] == 1)
 
 
+def test_remove_key_removes_matching_rows():
+    el = EmissionLines()
+    n_before = len(el.table)
+    el.remove_key("LyA")
+    assert "LyA" not in el.table["key"]
+    assert len(el.table) < n_before
+
+
 def test_assign_multiplets_basic_grouping():
     tab = Table(
         {
@@ -49,6 +57,22 @@ def test_assign_multiplets_basic_grouping():
     assert out["multiplet"][0] == out["multiplet"][1]
     assert out["multiplet"][2] == 0
     assert out["multiplet_term"][0] == "a2F-c2D"
+
+
+def test_assign_multiplets_classification_rules():
+    tab = Table(
+        {
+            "ion": ["X I", "X I"],
+            "wave_vac": [5000.0, 5100.0],
+            "configuration": ["a-b", "a-b"],
+            "terms": ["x-y", "x-y"],
+            "classification": ["forbidden", "permitted"],
+        }
+    )
+
+    out = assign_multiplets(tab)
+    terms = out["multiplet_term"].tolist()
+    assert terms == ["x-y", "x"]
 
 
 def test_calculate_multiplet_emissivities_formula():

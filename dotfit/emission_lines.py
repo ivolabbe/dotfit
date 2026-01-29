@@ -2,10 +2,8 @@ import re
 from pathlib import Path
 
 import numpy as np
-from astropy.table import Table, vstack
-from astropy import constants as const
+from astropy.table import MaskedColumn, Table, vstack
 import astropy.units as u
-import pandas as pd
 
 PACKAGE_DIR = Path(__file__).resolve().parent
 DATA_DIR = PACKAGE_DIR / "data" / "emission_lines"
@@ -21,28 +19,525 @@ LINE_GROUPS = {
     '[OI]': ['[OI]-5579', '[OI]-6302', '[OI]-6366'],
     '[SIII]': ['[SIII]-9071', '[SIII]-9533'],
     # Helium Lines
-    'HeI': [
-        'HeI-10833',
-        'HeI-7067',
-        'HeI-6680',
-        'HeI-5877',
-        'HeI-5017',
-        'HeI-4923',
-        'HeI-4473',
-        'HeI-4122',
-        'HeI-3890',
-        'HeI-3873',
-    ],
-    'HeI_T': ['HeI-10833', 'HeI-7067', 'HeI-5877', 'HeI-3890'],
-    'HeI_S': ['HeI-6680', 'HeI-5017', 'HeI-4923'],
-    # Broad Lines (typically used for BLR)
-    'HI': ['Ha', 'Hb', 'Hg', 'Hd', 'H7', 'H8', 'H9'],
-    'HI': ['Ha', 'Hb', 'Hg', 'Hd'],
     'HeI': ['HeI-10833', 'HeI-7067', 'HeI-5877'],
+    'HeI_T': ['HeI-10833', 'HeI-7067', 'HeI-5877', 'HeI-3890'],
+    'HeI_S': ['HeI-6680', 'HeI-5017', 'HeI-4923', 'HeI-4473', 'HeI-4122', 'HeI-3873'],
+    # Broad Lines (typically used for BLR)
+    'HI': ['Ha', 'Hb', 'Hg', 'Hd'],
     'OI': ['OI-1304', 'OI-8449'],
     'Pa': ['PaA', 'PaB', 'PaG', 'PaE', 'Pa9'],
     # Absorption Lines (typically stellar/ISM)
 }
+
+_MULTIPLET_KWARGS = {'Te', 'Ne', 'tolerance', 'verbose'}
+
+
+def _filter_multiplet_kwargs(kwargs):
+    filtered = {k: v for k, v in kwargs.items() if k in _MULTIPLET_KWARGS}
+    if 'ne' in kwargs and 'Ne' not in filtered:
+        filtered['Ne'] = kwargs['ne']
+    return filtered
+
+
+def _ensure_multiplet_ratios(tab, kwargs):
+    has_Te = 'Te' in kwargs
+    has_ne = 'ne' in kwargs or 'Ne' in kwargs
+    if not (has_Te and has_ne):
+        return tab
+
+    has_multiplet = 'multiplet' in tab.colnames and np.any(tab['multiplet'] != 0)
+    has_ratios = 'line_ratio' in tab.colnames and np.any(tab['line_ratio'] != 1.0)
+    if not (has_multiplet and has_ratios):
+        return multiplet_ratios(assign_multiplets(tab), **_filter_multiplet_kwargs(kwargs))
+    return tab
+
+
+def _build_multiplet_term(configuration, terms, lower_only):
+    if isinstance(terms, np.ma.core.MaskedConstant):
+        return configuration
+    if lower_only:
+        # Group by lower term only (extract before the '-')
+        return (
+            configuration.split('-')[0].strip() + '_' + terms.split('-')[0].strip()
+            if '-' in terms
+            else terms
+        )
+    # Group by full configuration and term (both lower and upper)
+    return configuration + '_' + terms.strip()
+
+
+def _parse_gigk(gigk_str):
+    """Parse gigk string like '10-8' to get (g_i, g_k)."""
+    if not gigk_str or gigk_str == '':
+        return np.nan, np.nan
+    try:
+        parts = str(gigk_str).split('-')
+        gi = float(parts[0])
+        gk = float(parts[1])
+        return gi, gk
+    except (ValueError, IndexError):
+        return np.nan, np.nan
+
+
+def _should_use_pyneb(ion, group):
+    if ion in {'H I', 'He I', 'He II'}:
+        return True
+    if 'classification' not in group.colnames:
+        return True
+    classes = []
+    for c in group['classification']:
+        if isinstance(c, np.ma.core.MaskedConstant):
+            continue
+        classes.append(str(c).strip().lower())
+    return any(c in {'forbidden', 'semi-forbidden'} for c in classes)
+
+
+def _boltzmann_ratios_for_group(group, Te=1e4, default=1.0, verbose=False):
+    if len(group) == 0:
+        return np.array([], dtype=float)
+    if len(group) == 1:
+        return np.array([default], dtype=float)
+
+    KB_EV = 8.617333262e-5  # Boltzmann constant in eV/K
+
+    gi_all = []
+    gu_all = []
+    if 'gigk' in group.colnames:
+        for g in group['gigk']:
+            gi, gu = _parse_gigk(g)
+            gi_all.append(gi)
+            gu_all.append(gu)
+    else:
+        gi_all = [np.nan] * len(group)
+        gu_all = [np.nan] * len(group)
+
+    gi_all = np.array(gi_all)
+    gu_all = np.array(gu_all)
+
+    if 'gf' in group.colnames and np.any(group['gf'] > 0):
+        f_all = group['gf'].astype(float) / gi_all
+    elif 'fik' in group.colnames:
+        f_all = group['fik'].astype(float)
+    else:
+        if verbose:
+            print("Warning: No 'gf' or 'fik' column found")
+        f_all = np.ones(len(group))
+
+    lam = np.array(group['wave_vac'], dtype=float)
+    Eu = np.array(group['Ek'], dtype=float)
+    E_ref = Eu[0]
+    delta_E = Eu - E_ref
+
+    I_weight = (
+        (lam[0] / lam) ** 3 * (f_all / f_all[0]) * (gu_all / gu_all[0]) * np.exp(-delta_E / (KB_EV * Te))
+    )
+
+    if np.sum(I_weight) > 0:
+        I_norm = I_weight / np.sum(I_weight)
+    else:
+        I_norm = np.zeros_like(I_weight)
+
+    return I_norm
+
+
+def plot_lines(
+    tab: Table,
+    fwhm_kms=300.0,
+    per_multiplet_normalize=False,
+    area_normalized=False,
+    all_normalize=False,
+    ngrid=4000,
+    Te=5_000,
+    offset=0.0,
+    lower_only=False,
+    inverse=False,
+    legend=False,
+    linestyle='-',
+):
+    """
+    Plot each multiplet as a sum of Gaussian lines, one color per multiplet.
+
+    Parameters
+    ----------
+    tab : astropy.table.Table
+        Must contain columns: 'wave_vac' [Å], 'multiplet' [int], 'line_ratio' [float].
+    fwhm_kms : float
+        Gaussian FWHM in km/s (applies per line at its wavelength).
+    per_multiplet_normalize : bool
+        If True, scale each multiplet profile to unit peak after summation.
+    area_normalized : bool
+        If True, each Gaussian integrates to line_ratio (area-normalized).
+        If False, each Gaussian peaks at line_ratio (peak-normalized).
+    all_normalize : float or False
+        If set, normalize all line ratios to this peak value.
+    ngrid : int
+        Number of wavelength grid points.
+    offset : float
+        Vertical offset for the profiles.
+    inverse : bool
+        If True, plot profiles downward from offset instead of upward.
+    legend : bool
+        If True, show legend with term labels.
+    Te : float
+        Temperature in K. If provided, apply a Boltzmann factor based on the
+        average lower-level energy per term (and per ion when multiple ions are
+        present). The factor is 1 when $E_i = kT$.
+    """
+    import matplotlib.pyplot as plt
+
+    linetab = tab.copy()
+    required = {"wave_vac"}
+    missing = required - set(linetab.colnames)
+    if missing:
+        raise ValueError(f"Missing columns in table: {missing}")
+
+    # always recalculate multiplets and line ratios if missing
+    if "multiplet" not in linetab.colnames:
+        linetab = assign_multiplets(linetab, lower_only=lower_only)
+        linetab = calculate_multiplet_emissivities(linetab, Te=Te)
+
+    if "line_ratio" not in linetab.colnames:
+        linetab = calculate_multiplet_emissivities(linetab, Te=Te)
+
+    # Scalar constants
+    c_kms = 299_792.458
+    wave = linetab["wave_vac"].astype(float)
+
+    # Build a common wavelength grid with padding based on max sigma
+    wmin, wmax = np.min(wave), np.max(wave)
+    sigma_max = (fwhm_kms / 2.354820045) * (wmax / c_kms)  # Å
+    pad = 5 * sigma_max + 2.0
+    lam = np.linspace(wmin - pad, wmax + pad, ngrid)
+
+    ions = np.unique(linetab["ion"].astype(str)) if "ion" in linetab.colnames else np.array([])
+    multi_ion = len(ions) > 1
+
+    # Group by ion + multiplet when multiple ions are present
+    group_keys = ["ion", "multiplet_term"] if multi_ion else ["multiplet_term"]
+    gtab = linetab.group_by(group_keys)
+    groups = gtab.groups
+
+    # Color cycle (by ion or by multiplet)
+    if multi_ion:
+        colors = plt.cm.tab20(np.linspace(0, 1, max(len(ions), 3)))
+        color_map = {ion: colors[i % len(colors)] for i, ion in enumerate(ions)}
+    else:
+        colors = plt.cm.tab20(np.linspace(0, 1, max(len(groups), 3)))
+        color_map = None
+
+    if all_normalize:
+        lr_all = linetab["line_ratio"].astype(float)
+        lr_all_norm = all_normalize / lr_all.max()
+
+    seen_labels = set()
+
+    k_B_eV = 8.617333262e-5
+    kT_eV = k_B_eV * Te if Te is not None else None
+
+    for i, grp in enumerate(groups):
+        mu = grp["wave_vac"].astype(float)  # centers (Å)
+        lr = grp["line_ratio"].astype(float)
+        sig = (fwhm_kms / 2.354820045) * (mu / c_kms)  # σ_λ per line (Å)
+
+        prof = np.zeros_like(lam)
+        for mu_i, s_i, a_i in zip(mu, sig, lr):
+            if s_i <= 0:
+                continue
+            g = np.exp(-0.5 * ((lam - mu_i) / s_i) ** 2)
+            if area_normalized:
+                # Area(g) = sqrt(2π)*σ; scale so ∫ = a_i
+                g *= a_i / (np.sqrt(2.0 * np.pi) * s_i)
+            else:
+                # Peak-normalized to a_i
+                g *= a_i
+            prof += g
+
+        if kT_eV is not None and kT_eV > 0 and "Ei" in grp.colnames:
+            avg_ei = np.nanmean(grp["Ei"].astype(float))
+            if np.isfinite(avg_ei):
+                boltz = np.exp(-(avg_ei - kT_eV) / kT_eV)
+                prof = prof * boltz
+
+        if per_multiplet_normalize and prof.max() > 0:
+            prof = prof / prof.max() * per_multiplet_normalize
+
+        if all_normalize:
+            prof = prof * lr_all_norm
+
+        # Apply inverse if requested
+        if inverse:
+            plot_prof = offset - prof
+            baseline = offset
+            idx = np.where(plot_prof < baseline)[0]
+        else:
+            plot_prof = prof + offset
+            baseline = offset
+            idx = np.where(plot_prof > baseline)[0]
+
+        if multi_ion:
+            grp_ion = str(grp["ion"][0])
+            color = color_map[grp_ion]
+            label = grp_ion
+        else:
+            color = colors[i % len(colors)]
+            label = f"{grp['multiplet_term'][0]}"
+
+        plot_label = label if (legend and label not in seen_labels) else None
+        if plot_label is not None:
+            seen_labels.add(label)
+
+        if idx.size == 0:
+            continue
+        plt.plot(lam[idx], plot_prof[idx], color=color, lw=1.5, ls=linestyle, label=plot_label)
+
+        # Optional vertical markers at line centers
+        ymark = np.interp(mu, lam, prof, left=0.0, right=0.0)
+        for x, y in zip(mu, ymark):
+            if inverse:
+                plt.vlines(x, baseline, baseline - y, color=color, alpha=0.5, lw=2, ls=linestyle)
+            else:
+                plt.vlines(x, baseline, baseline + y, color=color, alpha=0.5, lw=2, ls=linestyle)
+
+    plt.xlabel(r"Wavelength $\lambda$ (Å)")
+    plt.ylabel("Relative intensity")
+    if legend:
+        plt.legend(frameon=False, ncol=3)
+
+
+def plot_ion_models(
+    ion='H I',
+    wave_range=None,
+    tab=None,
+    sigut_table=None,
+    spectrum_dict=None,
+    Te=5_000,
+    fwhm_permitted=400.0,
+    fwhm_forbidden=100.0,
+    norm_permitted=0.3,
+    norm_forbidden=0.35,
+    norm_semiforbidden=0.35,
+    gf_threshold=0.0001,
+    Aki_threshold=0.001,
+    figsize=(7, 4.5),
+    spectrum_key='g235m',
+    spectrum_scale=50,
+    plot_forbidden=True,
+    plot_semiforbidden=True,
+    plot_permitted=True,
+    merge_semiforbidden=True,
+    verbose=False,
+    legend=True,
+):
+    """
+    Plot emission line models (permitted, semi-forbidden, forbidden) for any ion.
+
+    Parameters
+    ----------
+    ion : str
+        Ion name (e.g., 'Fe II', 'O III', 'He I')
+    wave_range : list of two floats
+        Wavelength range [min, max] in Å (rest-frame)
+    sigut_table : Table, optional
+        Sigut+03 Fe II template table (only used if provided)
+    spectrum_dict : dict, optional
+        Spectrum dictionary with keys like 'g235m' containing 'wave' and 'flux'
+    Te : float
+        Excitation temperature [K] for multiplet emissivities
+    fwhm_permitted : float
+        FWHM in km/s for permitted lines
+    fwhm_forbidden : float
+        FWHM in km/s for forbidden lines
+    norm_permitted : float
+        Normalization height for permitted lines
+    norm_forbidden : float
+        Normalization height for forbidden lines
+    norm_semiforbidden : float
+        Normalization height for semi-forbidden lines
+    gf_threshold : float
+        Minimum gf value for permitted/semi-forbidden lines
+    Aki_threshold : float
+        Minimum Aki value for forbidden lines
+    figsize : tuple
+        Figure size
+    spectrum_key : str
+        Key for spectrum in spectrum_dict to overlay
+    spectrum_scale : float
+        Scale factor for spectrum flux
+    plot_semiforbidden : bool
+        Whether to plot semi-forbidden lines
+    verbose : bool
+        Print diagnostic info
+
+    Returns
+    -------
+    dict
+        Dictionary with keys 'permitted', 'forbidden', 'semi-forbidden' containing the tables
+    """
+    import matplotlib.pyplot as plt
+
+    results = {}
+    linetab = tab.copy() if tab is not None else None
+    if linetab is None:
+        # Fetch lines from NIST
+        forbidden = get_line_nist(
+            ion=ion,
+            wave=wave_range,
+            tolerance=1,
+            sortkey='Aki',
+            threshold=f'Aki>{Aki_threshold}',
+            verbose=verbose,
+            classification='forbidden',
+            multiplet_lower_only=False,
+        )
+
+        permitted = get_line_nist(
+            ion=ion,
+            wave=wave_range,
+            tolerance=1,
+            sortkey='gf',
+            threshold=f'gf>{gf_threshold}',
+            verbose=verbose,
+            classification='permitted',
+            multiplet_lower_only=True,
+        )
+
+        semiforbidden = get_line_nist(
+            ion=ion,
+            wave=wave_range,
+            tolerance=1,
+            sortkey='gf',
+            threshold=f'gf>{gf_threshold}',
+            verbose=verbose,
+            classification='semi-forbidden',
+            multiplet_lower_only=True,
+        )
+    else:
+        permitted = linetab[[']' not in str(n) for n in linetab['ion']]]
+        forbidden = linetab[['[' in str(n) for n in linetab['ion']]]
+        semiforbidden = linetab[[']' in str(n) and '[' not in str(n) for n in linetab['ion']]]
+
+    if merge_semiforbidden and semiforbidden is not None and len(semiforbidden) > 0:
+        permitted = vstack([permitted, semiforbidden])
+        permitted = assign_multiplets(permitted, lower_only=True)
+        permitted = calculate_multiplet_emissivities(permitted, Te=Te)
+        semiforbidden = None
+
+    plt.figure(figsize=figsize)
+
+    # Permitted lines (bottom)
+    if permitted is not None and len(permitted) > 0 and plot_permitted:
+        plot_lines(
+            permitted, fwhm_kms=fwhm_permitted, all_normalize=norm_permitted, offset=0.0, linestyle='-'
+        )
+
+    # Forbidden lines (top, inverted)
+    if forbidden is not None and len(forbidden) > 0 and plot_forbidden:
+        plot_lines(
+            forbidden,
+            fwhm_kms=fwhm_forbidden,
+            all_normalize=norm_forbidden,
+            offset=1.0,
+            inverse=True,
+            legend=legend,
+            linestyle=':',
+        )
+
+    # Semi-forbidden (optional)
+    if plot_semiforbidden and semiforbidden is not None and len(semiforbidden) > 0:
+        plot_lines(
+            semiforbidden,
+            fwhm_kms=fwhm_forbidden,
+            all_normalize=norm_semiforbidden,
+            offset=0.9,
+            inverse=True,
+            legend=legend,
+            linestyle='-.',
+        )
+
+    # Overlay spectrum if provided
+    spectrum_ymax = 0
+    if spectrum_dict is not None and spectrum_key in spectrum_dict:
+        spec = spectrum_dict[spectrum_key]
+
+        # Filter spectrum to wavelength range
+        in_range = (spec['wave'] >= wave_range[0]) & (spec['wave'] <= wave_range[1])
+
+        if np.any(in_range):
+            # Normalize to median = 0.5 in the displayed window
+            flux_in_range = spec['flux'][in_range]
+            median_flux = np.nanmedian(flux_in_range)
+            flux_norm = spec['flux'] / median_flux * 0.5
+
+            plt.plot(spec['wave'], flux_norm, color='black', alpha=0.5, label='Observed', zorder=1)
+            spectrum_ymax = np.nanmax(flux_norm[in_range])
+
+    # Add vertical tick marks at line positions (just above spectrum at each wavelength)
+    tick_height = 0.03  # Height of tick marks (fraction of plot)
+
+    # Permitted lines (blue ticks)
+    if permitted is not None and len(permitted) > 0 and plot_permitted:
+        for wave in permitted['wave_vac']:
+            # Get spectrum value at this wavelength
+            if spectrum_ymax > 0 and np.any(in_range):
+                spec_y = np.interp(wave, spec['wave'], flux_norm, left=0, right=0)
+                tick_y = spec_y + 0.05
+            else:
+                tick_y = 0.05
+            plt.plot(
+                [wave, wave], [tick_y, tick_y + tick_height], color='blue', alpha=0.6, lw=1.0, zorder=10
+            )
+
+    # Forbidden lines (dashed ticks)
+    if forbidden is not None and len(forbidden) > 0 and plot_forbidden:
+        for wave in forbidden['wave_vac']:
+            if spectrum_ymax > 0 and np.any(in_range):
+                spec_y = np.interp(wave, spec['wave'], flux_norm, left=0, right=0)
+                tick_y = spec_y + 0.05
+            else:
+                tick_y = 0.05
+            plt.plot(
+                [wave, wave],
+                [tick_y, tick_y + tick_height],
+                ls='--',
+                color='blue',
+                alpha=0.6,
+                lw=1.0,
+                zorder=10,
+            )
+
+    # Semi-forbidden lines (orange ticks)
+    if plot_semiforbidden and semiforbidden is not None and len(semiforbidden) > 0:
+        for wave in semiforbidden['wave_vac']:
+            if spectrum_ymax > 0 and np.any(in_range):
+                spec_y = np.interp(wave, spec['wave'], flux_norm, left=0, right=0)
+                tick_y = spec_y + 0.05
+            else:
+                tick_y = 0.05
+            plt.plot(
+                [wave, wave],
+                [tick_y, tick_y + tick_height],
+                ls='-.',
+                color='blue',
+                alpha=0.6,
+                lw=1.0,
+                zorder=10,
+            )
+
+    if wave_range is None:
+        if spectrum_dict is not None and spectrum_key in spectrum_dict:
+            spec = spectrum_dict[spectrum_key]
+            wave_range = [min(spec['wave']), max(spec['wave'])]
+        else:
+            wave_range = [4000, 7000]
+
+    plt.xlim(*wave_range)
+    plt.ylim(0, 1)
+    plt.xlabel('Rest wavelength [Å]')
+    plt.ylabel('Normalized intensity')
+
+    plt.tight_layout()
+
+    return results
 
 
 class EmissionLines:
@@ -84,9 +579,10 @@ class EmissionLines:
         return sorted(p.name for p in datadir.iterdir())
 
     def remove_key(self, key):
-        ix_remove = np.where(self.table['key'] != key)[0]
+        ix_remove = np.where(self.table['key'] == key)[0]
         if len(ix_remove) > 0:
             self.table.remove_rows(ix_remove)
+            self.lines = {l['key']: dict(l) for l in self.table}
 
     def get_table(self, search_key=None, wave=None, multiplet=False, **kwargs):
         if wave is not None:
@@ -116,12 +612,7 @@ class EmissionLines:
 
         if multiplet:
             # Only recalculate if multiplet/line_ratio columns are missing or trivial
-            has_multiplet = 'multiplet' in tab.colnames and np.any(tab['multiplet'] != 0)
-            has_ratios = 'line_ratio' in tab.colnames and np.any(tab['line_ratio'] != 1.0)
-
-            if not (has_multiplet and has_ratios):
-                mr_kwargs = {k: v for k, v in kwargs.items() if k in ['Te', 'Ne', 'tolerance', 'verbose']}
-                tab = multiplet_ratios(assign_multiplets(tab), **mr_kwargs)
+            tab = _ensure_multiplet_ratios(tab, kwargs)
 
         return tab
 
@@ -156,6 +647,12 @@ class EmissionLines:
         #        self.add_ion(ion, new_wave_mix, new_wave_vac, new_flux_ratio)
         pass
 
+    def plot_lines(self, tab: Table, **kwargs):
+        return plot_lines(tab, **kwargs)
+
+    def plot_ion_models(self, **kwargs):
+        return plot_ion_models(**kwargs)
+
     def find_duplicates(self, keys=['ion', 'wave_vac'], remove=False):
         """
         Find duplicate entries in the table based on specified keys.
@@ -168,6 +665,7 @@ class EmissionLines:
         Returns:
             Table: A table containing the duplicate entries.
         """
+
         from astropy.table import unique
 
         # Get groups of duplicates
@@ -451,7 +949,7 @@ class EmissionLines:
             kwargs = {}
 
             for k, v in g.items():
-                if k in ['TieRedshift', 'TieDispersion', 'multiplet', 'Te', 'Ne', 'additional']:
+                if k in ['TieRedshift', 'TieDispersion', 'Te', 'Ne', 'ne', 'additional']:
                     kwargs[k] = v
                 elif k == 'wave':
                     kwargs['wave'] = v
@@ -461,6 +959,11 @@ class EmissionLines:
                 else:
                     # Assume other keys are kwargs too
                     kwargs[k] = v
+
+            if 'ne' in kwargs and 'Ne' not in kwargs:
+                kwargs['Ne'] = kwargs['ne']
+            elif 'Ne' in kwargs and 'ne' not in kwargs:
+                kwargs['ne'] = kwargs['Ne']
 
             if group_name is None:
                 continue
@@ -487,15 +990,16 @@ class EmissionLines:
             }
 
             # Prepare get_table kwargs
-            # Default multiplet to True unless specified False
-            multiplet = kwargs.pop('multiplet', True)
             additional = kwargs.pop('additional', None)
+            should_recalc = 'Te' in kwargs and ('ne' in kwargs or 'Ne' in kwargs)
 
             # Fetch tables for each alias
             tables = []
             aliases = [x.strip() for x in line_string.split(',')]
             for alias in aliases:
                 try:
+                    multiplet = alias.endswith('*')
+                    alias = alias[:-1].strip() if multiplet else alias
                     t = None
                     # If multiplet is requested, check if alias is a specific line key that belongs to a multiplet
                     if multiplet and alias in self.table['key']:
@@ -504,15 +1008,13 @@ class EmissionLines:
                     if t is None:
                         # Pass multiplet and kwargs (Te, Ne, etc.)
                         t = self.get_table(alias, multiplet=multiplet, **kwargs)
-                    elif multiplet:
+                    elif multiplet and should_recalc:
                         # If we got a table from get_multiplet, ensure ratios are calculated if missing
-                        has_ratios = 'line_ratio' in t.colnames and np.any(t['line_ratio'] != 1.0)
-                        if not has_ratios:
-                            # Filter kwargs for multiplet_ratios
-                            mr_kwargs = {
-                                k: v for k, v in kwargs.items() if k in ['Te', 'Ne', 'tolerance', 'verbose']
-                            }
-                            t = multiplet_ratios(assign_multiplets(t), **mr_kwargs)
+                        t = _ensure_multiplet_ratios(t, kwargs)
+
+                    if t is not None and 'use_multiplet' not in t.colnames:
+                        t = t.copy()
+                        t['use_multiplet'] = np.full(len(t), multiplet, dtype=bool)
 
                     if len(t) > 0:
                         tables.append(t)
@@ -533,19 +1035,26 @@ class EmissionLines:
 
                 # Determine subgroups based on multiplets
                 subgroups = []
-                if multiplet and 'multiplet' in ion_table.colnames:
-                    unique_multis = np.unique(ion_table['multiplet'])
-                    # If 0 is present, those lines are treated individually or as a group 0
-                    # But typically we want to iterate over all unique multiplet IDs found
-                    for m in unique_multis:
-                        subgroups.append(ion_table[ion_table['multiplet'] == m])
+                if 'use_multiplet' in ion_table.colnames:
+                    multi_mask = ion_table['use_multiplet'] & (ion_table['multiplet'] > 0)
+                    if np.any(multi_mask):
+                        for m in np.unique(ion_table['multiplet'][multi_mask]):
+                            subgroups.append(ion_table[multi_mask & (ion_table['multiplet'] == m)])
+                    non_multi = ion_table[~multi_mask]
+                    if len(non_multi) > 0:
+                        subgroups.append(non_multi)
                 else:
                     subgroups.append(ion_table)
 
                 for species_table in subgroups:
                     # Normalize ratios per multiplet (weakest to 1.0)
+                    if 'use_multiplet' in species_table.colnames:
+                        use_multi = bool(np.any(species_table['use_multiplet']))
+                    else:
+                        use_multi = False
+
                     if (
-                        multiplet is not None
+                        use_multi
                         and 'multiplet' in species_table.colnames
                         and 'line_ratio' in species_table.colnames
                     ):
@@ -568,7 +1077,7 @@ class EmissionLines:
                     species_name = ion.replace(' ', '')
 
                     # Append multiplet ID to species name if applicable
-                    if multiplet and 'multiplet' in species_table.colnames:
+                    if use_multi and 'multiplet' in species_table.colnames:
                         m_vals = species_table['multiplet']
                         if len(m_vals) > 0 and m_vals[0] > 0:
                             species_name = f"{species_name}m{m_vals[0]}"
@@ -580,7 +1089,7 @@ class EmissionLines:
                         # Handle RelStrength
                         rel_strength = None
                         # Only use ratio if multiplet calculation was enabled
-                        if multiplet and 'line_ratio' in row.colnames and row['multiplet'] > 0:
+                        if use_multi and 'line_ratio' in row.colnames and row['multiplet'] > 0:
                             val = row['line_ratio']
                             if not np.ma.is_masked(val) and not np.isnan(val):
                                 rel_strength = float(val)
@@ -846,9 +1355,6 @@ def read_kurucz_table(
             key = f"{ion_nospace}-{wl_vac:.0f}"
             ion_out = ion_plain
 
-        # Build ion_tex from the possibly bracketed ion_out
-        ion_tex = replace_greek(replace_brackets_with_dollars(ion_out))
-        ion_tex_lambda = (ion_tex + r"$\,\lambda" + f"{wl_vac:.0f}$").replace("$$", "")
         if classification == "semi-forbidden":
             ion_out = ion_out.replace("]", '')  # loose the ] in ion for semi-forbidden
 
@@ -866,15 +1372,13 @@ def read_kurucz_table(
                 terms,
                 ji_jk,
                 "E1",
-                ref,
-                "--",
                 wl_air,
-                ion_tex,
-                ion_tex_lambda,
                 classification,
                 gf,
                 0,
                 1.0,
+                ref,
+                "--",
             )
         )
 
@@ -893,15 +1397,13 @@ def read_kurucz_table(
             "terms",
             "Ji-Jk",
             "type",
-            "references",
-            "note",
             "wave_air",
-            "ion_tex",
-            "ion_tex_lambda",
             "classification",
             "gf",
             "multiplet",
             "line_ratio",
+            "references",
+            "note",
         ],
         dtype=[
             "U14",
@@ -916,15 +1418,13 @@ def read_kurucz_table(
             "U14",
             "U9",
             "U2",
-            "U14",
-            "U10",
             "float64",
-            "U13",
-            "U27",
             "U27",
             "float64",
             "int64",
             "float64",
+            "U14",
+            "U10",
         ],
     )
 
@@ -934,6 +1434,100 @@ def read_kurucz_table(
             tab = calculate_multiplet_emissivities(tab, Te=Te)
 
     return tab
+
+
+def read_sigut_table(path: str | Path) -> Table:
+    """
+    Read Sigut et al. 2003 Fe II table into an Astropy Table.
+
+    Parameters
+    ----------
+    path : str or Path
+        Path to sigut_03.tab file
+
+    Returns
+    -------
+    Table
+        Astropy Table with columns similar to get_line_nist output
+    """
+    path = Path(path)
+
+    waves = []
+    upper_levels = []
+    lower_levels = []
+    lower_energies = []
+    fluxes = []
+
+    with path.open("r", encoding="utf-8") as fh:
+        for line in fh:
+            if len(line) < 52 or not line[:9].strip():
+                continue
+            try:
+                wave = float(line[0:9])
+            except ValueError:
+                continue
+
+            waves.append(wave)
+            upper_levels.append(line[10:24].strip())
+            lower_levels.append(line[25:39].strip())
+            lower_energies.append(float(line[40:46]))
+            fluxes.append(int(line[47:52]))
+
+    def parse_sigut_level(level_str):
+        """
+        Parse Sigut level string like 'a 4F9/2' into (term, J).
+        Returns ('', '') if parsing fails.
+        """
+        if not level_str:
+            return '', ''
+        parts = level_str.strip().replace('^', '').split('_')
+        return parts[0].replace('o', '*').replace('e', ''), parts[1]
+
+    # Parse levels
+    terms_list = []
+    jijk_list = []
+
+    for lower, upper in zip(lower_levels, upper_levels):
+        lower_term, lower_j = parse_sigut_level(lower)
+        upper_term, upper_j = parse_sigut_level(upper)
+
+        if lower_term and upper_term:
+            terms = f"{lower_term}-{upper_term}"
+            jijk = f"{lower_j}-{upper_j}"
+        else:
+            terms = ''
+            jijk = ''
+
+        terms_list.append(terms)
+        jijk_list.append(jijk)
+
+    # Create keys similar to NIST format
+    keys = [f"FeII-{int(w)}" for w in waves]
+
+    tab = Table(
+        {
+            'key': keys,
+            'ion': ['Fe II'] * len(waves),
+            'wave_vac': air_to_vacuum(waves),
+            'Ei': lower_energies,
+            'Ek': [0.0] * len(waves),
+            'Aki': [0.0] * len(waves),
+            'fik': [0.0] * len(waves),
+            'gigk': [''] * len(waves),
+            'configuration': [''] * len(waves),
+            'terms': terms_list,
+            'Ji-Jk': jijk_list,
+            'type': ['E1'] * len(waves),
+            'wave_air': waves,
+            'classification': ['permitted'] * len(waves),
+            'gf': [0.0] * len(waves),
+            'line_ratio': fluxes,
+            'references': ['Sigut+03'] * len(waves),
+            'note': [''] * len(waves),
+        }
+    )
+
+    return assign_multiplets(tab, lower_only=True)
 
 
 # Backwards compatible alias with the legacy implementation name.
@@ -1275,12 +1869,10 @@ def get_line_nist(
             'terms',
             'Ji-Jk',
             'type',
+            'wave_air',
+            'classification',
             'references',
             'note',
-            'wave_air',
-            'ion_tex',
-            'ion_tex_lambda',
-            'classification',
         ],
         dtype=[
             'U14',
@@ -1295,12 +1887,10 @@ def get_line_nist(
             'U14',
             'U8',
             'U2',
+            'float64',
+            'U27',
             'U14',
             'U10',
-            'float64',
-            'U13',
-            'U27',
-            'U27',
         ],
     )
 
@@ -1406,15 +1996,10 @@ def get_line_nist(
 
             key = ion_tab.replace(' ', '') + f"-{row['Ritz']:.0f}"
 
-        ion_tex = ion_tab.replace(']', '$]$').replace('[', '$[$')
-
         # use of 'ion' is not entirely consistent here: ion is both ion + transition type
         # use same ion code for semi-forbidden as for permitted, for assign_multiplets etc
         if cval == 'semi-forbidden':
             ion_tab = ion_tab.replace(']', '')
-
-        if ion == 'H I':
-            ion_tex = ion_tex[:-1] + replace_with_latex(ion_tex[-1])
 
         if verbose:
             print(f"Classification: {cval}")
@@ -1440,12 +2025,10 @@ def get_line_nist(
                 terms,
                 JiJk,
                 out_type,
+                wave_air,
+                cval,
                 'NIST',
                 '',
-                wave_air,
-                ion_tex,
-                rf"{ion_tex}$\,\lambda{row['Ritz']:.0f}$".replace('$$', ''),
-                cval,
             ]
         )
 
@@ -1633,19 +2216,25 @@ def assign_multiplets(intab, verbose=False, lower_only=False):
         # Group by lower term only (extract before the '-')
         # @@@ do we need the full configuration here? or just the term? Sometimes terms are abbreviated eg 6P
         multiplet_term = [
-            (
-                c
-                if isinstance(t, np.ma.core.MaskedConstant)
-                else c.split('-')[0].strip() + '_' + t.split('-')[0].strip() if '-' in t else t
-            )
-            for c, t in zip(tab['configuration'], tab['terms'])
+            _build_multiplet_term(c, t, lower_only=True) for c, t in zip(tab['configuration'], tab['terms'])
         ]
     else:
-        # Group by full configuration and term (both lower and upper)
-        multiplet_term = [
-            (c if isinstance(t, np.ma.core.MaskedConstant) else c + '_' + t.strip())
-            for c, t in zip(tab['configuration'], tab['terms'])
-        ]
+        # Group by full configuration and term (both lower and upper) unless classification suggests otherwise
+        # Forbidden: full lower+upper terms. Permitted/semi-forbidden: lower term only.
+        if 'classification' in tab.colnames:
+            multiplet_term = []
+            for c, t, cls in zip(tab['configuration'], tab['terms'], tab['classification']):
+                if isinstance(cls, np.ma.core.MaskedConstant):
+                    cls_val = ''
+                else:
+                    cls_val = str(cls).strip().lower()
+                use_lower_only = cls_val in {'permitted', 'semi-forbidden'}
+                multiplet_term.append(_build_multiplet_term(c, t, lower_only=use_lower_only))
+        else:
+            multiplet_term = [
+                _build_multiplet_term(c, t, lower_only=False)
+                for c, t in zip(tab['configuration'], tab['terms'])
+            ]
 
     tab['multiplet_term'] = multiplet_term
     if verbose:
@@ -1677,7 +2266,12 @@ def assign_multiplets(intab, verbose=False, lower_only=False):
                 if verbose:
                     print(f"Single line: {group['ion'][0]} {group['multiplet_term'][0]}")
     for t in tab:
-        t['multiplet_term'] = t['multiplet_term'].split('_')[1]
+        term_val = t['multiplet_term']
+        if isinstance(term_val, np.ma.core.MaskedConstant):
+            continue
+        term_str = str(term_val)
+        if '_' in term_str:
+            t['multiplet_term'] = term_str.split('_', 1)[1]
     return tab
 
 
@@ -1715,25 +2309,25 @@ def calculate_multiplet_ratio(
 
     # Calculate emissivity ratios
     try:
-        ratios = emissivity_ratios(
-            atom,
-            roman_to_int(level),
-            np.asarray(group['wave_vac']),
-            Te=Te,
-            Ne=Ne,
-            tolerance=tolerance,
-            verbose=verbose,
-        )
-        # Check if ratios are all NaN or zero (which might happen if PyNeb returns nothing useful)
-        if np.all(np.isnan(ratios)) or np.all(ratios == 0):
-            raise ValueError("PyNeb returned no valid emissivities")
+        if _should_use_pyneb(ion, group):
+            ratios = emissivity_ratios(
+                atom,
+                roman_to_int(level),
+                np.asarray(group['wave_vac']),
+                Te=Te,
+                Ne=Ne,
+                tolerance=tolerance,
+                verbose=verbose,
+            )
+            # Check if ratios are all NaN or zero (which might happen if PyNeb returns nothing useful)
+            if np.all(np.isnan(ratios)) or np.all(ratios == 0):
+                raise ValueError("PyNeb returned no valid emissivities")
+        else:
+            ratios = _boltzmann_ratios_for_group(group, Te=Te, default=default, verbose=verbose)
 
     except Exception as e:
         if verbose:
-            print(
-                f"PyNeb calculation failed for {ion}: {e}. Falling back to calculate_multiplet_emissivities."
-            )
-        # Fallback to 1:1
+            print(f"Emissivity calculation failed for {ion}: {e}. Falling back to flat ratios.")
         ratios = np.full(len(group), default)
 
     return ratios
@@ -1781,6 +2375,70 @@ def multiplet_ratios(tab, Te=1e4, Ne=1e2, tolerance=0.1, verbose=False):
             tab['line_ratio'][mask] = ratios
 
     return tab
+
+
+def apply_multiplet_rules(
+    tab, Te_emission=10_000, Te_absorption=5_000, Ne=1e4, tolerance=0.1, verbose=False, except_keys=None
+):
+    """
+    Assign multiplets and line ratios using classification-aware rules.
+
+    Forbidden lines use lower+upper terms; permitted/semi-forbidden use lower terms only.
+    Line ratios use Te_emission for emission lines and Te_absorption for absorption lines.
+    """
+    out = assign_multiplets(tab)
+
+    if 'line_ratio' not in out.colnames:
+        out['line_ratio'] = 0.0
+
+    abs_mask = np.zeros(len(out), dtype=bool)
+
+    if 'classification' in out.colnames:
+        cls = np.array(out['classification'])
+        for i, val in enumerate(cls):
+            if isinstance(val, np.ma.core.MaskedConstant):
+                continue
+            if str(val).strip().lower() == 'absorption':
+                abs_mask[i] = True
+
+    if 'type' in out.colnames:
+        typ = np.array(out['type'])
+        for i, val in enumerate(typ):
+            if isinstance(val, np.ma.core.MaskedConstant):
+                continue
+            if 'absorption' in str(val).strip().lower():
+                abs_mask[i] = True
+
+    em_mask = ~abs_mask
+
+    if np.any(em_mask):
+        em_tab = out[em_mask]
+        em_tab = multiplet_ratios(em_tab, Te=Te_emission, Ne=Ne, tolerance=tolerance, verbose=verbose)
+        out['line_ratio'][em_mask] = em_tab['line_ratio']
+
+    if np.any(abs_mask):
+        abs_tab = out[abs_mask]
+        abs_tab = calculate_multiplet_emissivities(abs_tab, Te=Te_absorption, verbose=verbose)
+        out['line_ratio'][abs_mask] = abs_tab['line_ratio']
+
+    if except_keys is None:
+        except_keys = ['CaII-3935', 'CaII-8500']
+
+    if 'key' in out.colnames:
+        except_keys = set(except_keys)
+        for key in out['key']:
+            if key not in except_keys:
+                continue
+            key_mask = out['key'] == key
+            if not np.any(key_mask):
+                continue
+            multiplet_id = out['multiplet'][key_mask][0] if 'multiplet' in out.colnames else 0
+            if multiplet_id and multiplet_id != 0:
+                out['line_ratio'][out['multiplet'] == multiplet_id] = 1.0
+            else:
+                out['line_ratio'][key_mask] = 1.0
+
+    return out
 
 
 # def multiplet_ratios(tab, Te=1e4, Ne=1e2, tolerance=1.0):
@@ -1890,7 +2548,6 @@ def add_hydrogen_entries(emission_table, hydrogen_table, tolerance=0.27):
         key = construct_hydrogen_key(config)
 
         # Check for a matching entry in the emission table
-        match_found = False
         for i, e_row in enumerate(emission_table):
             e_wave = e_row['wave_vac']
             if abs(h_wave - e_wave) <= tolerance:
@@ -1914,6 +2571,7 @@ from astropy.table import Column
 def generate_line_table(
     tab_input='/Users/ivo/Desktop/current/agn/agn/data/emission_lines/emission_lines.csv', ndigits=3
 ):
+    """Deprecated legacy generator retained for compatibility."""
     tab = Table.read(tab_input)
 
     # add Aki column for transition probabilities
@@ -1940,15 +2598,10 @@ def generate_line_table(
             for r in tab[c]
         ]
 
-    # add hydrogen lines
-    htab = hydrogen_lines(ndigits=ndigits)
+    # add hydrogen lines (legacy placeholder; NIST-based replacement below)
+    # htab = hydrogen_lines(ndigits=ndigits)
 
     # cross check with grizli table
-
-    tab['ion_tex'] = [replace_greek(replace_brackets_with_dollars(i)) for i in tab['ion']]
-    tab['ion_tex_lambda'] = [
-        (i + r'$\,\lambda' + f'{w:.0f}$').replace('$$', '') for i, w in zip(tab['ion_tex'], tab['wave_vac'])
-    ]
 
     tab['key'] = [
         replace_greek(i, tex=False).replace(' ', '') + f'-{w:.0f}'
@@ -1978,6 +2631,7 @@ def generate_line_table(
 
 
 def add_grizli_lines(tab):
+    """Deprecated legacy helper retained for compatibility."""
     # no match HeII-5412 H F [5412.5] nearest [FeVI]-5426 5425.728 # not in NIST
     # no match MgII M M [2799.117] nearest MgII-2796 2796.352 -> [MgII]-2803 already in table
     # no match SiIV+OIV-1398 S O [1398.0] nearest OIV]-1397 1397.232 -> [OIV]-1398 already in table
@@ -2005,6 +2659,7 @@ def add_grizli_lines(tab):
 
 
 def compare_grizli_entries(tab, tolerance=1.0):
+    """Deprecated legacy helper retained for compatibility."""
     from . import models
 
     lw, lr = models.get_line_wavelengths()
@@ -2020,7 +2675,7 @@ def compare_grizli_entries(tab, tolerance=1.0):
         #        print(k, lw[k], element[imin], tab['ion'][imin], element[imin] == k[0], dw[imin], dw[imin] < tolerance)
         grizli_key = k.replace('[', '').replace(']', '')
         if (element[imin] == k[0]) and (dw[imin] < tolerance):
-            print(f' match {k} {k[0]} {lw[k][0]} {tab['key'][imin]} {tab['wave_vac'][imin]}')
+            print(f" match {k} {k[0]} {lw[k][0]} {tab['key'][imin]} {tab['wave_vac'][imin]}")
         else:
             print(
                 'no match',
@@ -2028,7 +2683,7 @@ def compare_grizli_entries(tab, tolerance=1.0):
                 k[0],
                 element[imin],
                 lw[k],
-                f'nearest {tab['key'][imin]} {tab['wave_vac'][imin]}',
+                f"nearest {tab['key'][imin]} {tab['wave_vac'][imin]}",
             )
     return element
 
@@ -2037,6 +2692,7 @@ def compare_grizli_entries(tab, tolerance=1.0):
 # search among the first element of the list
 # only consider lists with <= max_len
 def find_nearest_key(lw_dict, value, min_len=1, max_len=3, **kwargs):
+    """Deprecated legacy helper retained for compatibility."""
     singledict = single_line_dict(lw_dict, min_len=1, max_len=3, atol=0.1)
     #    print(singledict['OI-6302'])
     #    singledict = {k: v[0] for k, v in dictionary.items() if len(v) >= min_len and len(v) <= max_len}
@@ -2044,17 +2700,40 @@ def find_nearest_key(lw_dict, value, min_len=1, max_len=3, **kwargs):
     return min(singledict.keys(), key=lambda k: abs(singledict[k][0] - value))
 
 
-# def get_line_keys(lw, line_complex, **kwargs):
-#    return [models.find_nearest_key(lw, k) for k in lw[line_complex]]
+def single_line_dict(lw_dict, min_len=1, max_len=3, atol=0.1, verbose=False):
+    """Deprecated legacy helper retained for compatibility."""
+    singledict = {k: [v[0]] for k, v in lw_dict.items() if len(v) == 1}
+    sdv = np.array(list(singledict.values()))
+    for k, v in lw_dict.items():
+        if len(v) > min_len and len(v) < max_len:
+            for vv in v:
+                close = np.isclose(sdv, vv, atol=atol)
+                if not any(close):
+                    if verbose:
+                        print(k, vv, ' not found in single dict, adding ', k.split('-')[0] + f'-{vv:.0f}')
+                    singledict[k.split('-')[0] + f'-{vv:.0f}'] = [vv]
+    return singledict
+
+
+def get_line_keys(lw, line_complex, **kwargs):
+    """Deprecated legacy helper retained for compatibility."""
+    return [find_nearest_key(lw, w, **kwargs) for w in lw[line_complex]]
+
+
+def get_line_wavelengths(multiplet=True):
+    """Deprecated legacy helper retained for compatibility."""
+    return EmissionLines().get_line_wavelengths(multiplet=multiplet)
 
 
 def get_line_list():
+    """Deprecated legacy helper retained for compatibility."""
     lw, lr = get_line_wavelengths()
     ln = {k: get_line_keys(lw, k) for k in lw}
     return lw, lr, ln
 
 
 def unique_lines():
+    """Deprecated legacy helper retained for compatibility."""
     lw, lr = get_line_wavelengths()
     uw = list(set([w for k in lw for w in lw[k]]))
     uw.sort()
@@ -2063,6 +2742,7 @@ def unique_lines():
 
 
 def cdf(wave, flux):
+    """Deprecated legacy helper retained for compatibility."""
     norm = np.trapezoid(flux, wave)
     if norm == 0:
         return np.zeros_like(wave)
@@ -2103,24 +2783,11 @@ def calculate_multiplet_emissivities(tab, Te=10_000, default=1.0, verbose=False)
     if 'line_ratio' not in tab.colnames:
         tab['line_ratio'] = default
 
-    # Parse gigk to get g_u (upper state degeneracy)
-    def parse_gigk(gigk_str):
-        """Parse gigk string like '10-8' to get (g_i, g_k)."""
-        if not gigk_str or gigk_str == '':
-            return np.nan, np.nan
-        try:
-            parts = gigk_str.split('-')
-            gi = float(parts[0])  # lower state
-            gk = float(parts[1])  # upper state
-            return gi, gk
-        except (ValueError, IndexError):
-            return np.nan, np.nan
-
     # Extract gi, gu for all rows
     gi_all = []
     gu_all = []
     for g in tab['gigk']:
-        gi, gu = parse_gigk(str(g))
+        gi, gu = _parse_gigk(g)
         gi_all.append(gi)
         gu_all.append(gu)
 
@@ -2278,6 +2945,3 @@ def replace_brackets_with_dollars(text):
     text = text.replace("[", r"$[$")
     text = text.replace("]", r"$]$")
     return text.replace('$$', '')
-
-
-from astropy.table import MaskedColumn, Table, vstack
