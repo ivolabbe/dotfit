@@ -98,6 +98,7 @@ def test_calculate_multiplet_emissivities_formula():
     f = np.array([1.0, 0.5]) / gi
     delta_E = Eu - Eu[0]
     i_weight = (lam[0] / lam) ** 3 * (f / f[0]) * (gu / gu[0]) * np.exp(-delta_E / (KB_EV * 10_000))
-    expected = i_weight / np.sum(i_weight)
+    # New implementation normalizes to max=1 instead of sum=1
+    expected = i_weight / np.max(i_weight)
 
     assert np.allclose(lr, expected, rtol=0, atol=1e-12)
