@@ -2437,7 +2437,8 @@ def apply_multiplet_rules(
     Ne=1e4,
     tolerance=0.1,
     verbose=False,
-    except_keys=None,
+    #    except_keys=['CaII-3935', 'CaII-8500'],
+    except_keys=['CaII-8500'],
     normalize_multiplet=True,
 ):
     """
@@ -2447,26 +2448,18 @@ def apply_multiplet_rules(
     Line ratios use Te_emission for emission lines and Te_absorption for absorption lines.
     """
     out = assign_multiplets(tab)
-
+    out = tab.copy()
     if 'line_ratio' not in out.colnames:
         out['line_ratio'] = 0.0
 
     abs_mask = np.zeros(len(out), dtype=bool)
 
     if 'classification' in out.colnames:
-        cls = np.array(out['classification'])
-        for i, val in enumerate(cls):
+        ltype = np.array(out['classification'])
+        for i, val in enumerate(ltype):
             if isinstance(val, np.ma.core.MaskedConstant):
                 continue
-            if str(val).strip().lower() == 'absorption':
-                abs_mask[i] = True
-
-    if 'type' in out.colnames:
-        typ = np.array(out['type'])
-        for i, val in enumerate(typ):
-            if isinstance(val, np.ma.core.MaskedConstant):
-                continue
-            if 'absorption' in str(val).strip().lower():
+            if str(val).strip().lower() == 'permitted' or str(val).strip().lower() == 'semi-forbidden':
                 abs_mask[i] = True
 
     em_mask = ~abs_mask
@@ -2497,9 +2490,6 @@ def apply_multiplet_rules(
                     max_r = np.max(ratios[valid])
                     if max_r > 0:
                         out['line_ratio'][m_mask] = ratios / max_r
-
-    if except_keys is None:
-        except_keys = ['CaII-3935', 'CaII-8500']
 
     if 'key' in out.colnames:
         except_keys = set(except_keys)
