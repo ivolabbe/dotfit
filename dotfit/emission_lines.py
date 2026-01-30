@@ -142,6 +142,7 @@ def _boltzmann_ratios_for_group(group, Te=1e4, default=1.0, verbose=False):
 
 def plot_lines(
     tab: Table,
+    wave=None,
     fwhm_kms=300.0,
     per_multiplet_normalize=False,
     area_normalized=False,
@@ -186,6 +187,10 @@ def plot_lines(
     import matplotlib.pyplot as plt
 
     linetab = tab.copy()
+    if wave is not None:
+        iwave = (linetab['wave_vac'] >= wave[0]) & (linetab['wave_vac'] <= wave[1])
+        linetab = linetab[iwave]
+
     required = {"wave_vac"}
     missing = required - set(linetab.colnames)
     if missing:
@@ -642,13 +647,13 @@ class EmissionLines:
         else:
             return ion_tab[match]
 
-    def replace_ion(self, key, new_wave_mix, new_wave_vac, new_flux_ratio):
-        #        self.remove_ion(ion)
-        #        self.add_ion(ion, new_wave_mix, new_wave_vac, new_flux_ratio)
-        pass
+    # def replace_ion(self, key, new_wave_mix, new_wave_vac, new_flux_ratio):
+    #     #        self.remove_ion(ion)
+    #     #        self.add_ion(ion, new_wave_mix, new_wave_vac, new_flux_ratio)
+    #     pass
 
-    def plot_lines(self, tab: Table, **kwargs):
-        return plot_lines(tab, **kwargs)
+    def plot_lines(self, **kwargs):
+        return plot_lines(self.table, **kwargs)
 
     def plot_ion_models(self, **kwargs):
         return plot_ion_models(**kwargs)
@@ -768,6 +773,11 @@ class EmissionLines:
                 print(k, lw[k], lr[k])
 
         return lw, lr
+
+    # thin wrapper for calculate_multiplet_ratio
+    @staticmethod
+    def multiplet_ratios(*args, **kwargs):
+        return multiplet_ratios(*args, **kwargs)
 
     def save(self, filename=None):
         if filename is None:
@@ -2303,6 +2313,7 @@ def calculate_multiplet_ratio(
     Ne=1e2,
     tolerance=0.1,
     default=1.0,
+    relative=True,
     verbose=False,
     return_method=False,
 ):
@@ -2341,6 +2352,7 @@ def calculate_multiplet_ratio(
                 Te=Te,
                 Ne=Ne,
                 tolerance=tolerance,
+                relative=relative,
                 verbose=False,
             )
             # Check if ratios are all NaN or zero (which might happen if PyNeb returns nothing useful)
@@ -2362,7 +2374,7 @@ def calculate_multiplet_ratio(
     return ratios
 
 
-def multiplet_ratios(tab, Te=1e4, Ne=1e2, tolerance=0.1, verbose=False):
+def multiplet_ratios(tab, Te=1e4, Ne=1e2, tolerance=0.1, relative=True, verbose=False):
     """
     Calculate line intensity ratios for all multiplets in the table.
     Assumes multiplet column already exists and is populated.
@@ -2406,6 +2418,7 @@ def multiplet_ratios(tab, Te=1e4, Ne=1e2, tolerance=0.1, verbose=False):
                 multiplet_num,
                 Te=Te,
                 Ne=Ne,
+                relative=relative,
                 tolerance=tolerance,
                 verbose=verbose,
                 return_method=True,
