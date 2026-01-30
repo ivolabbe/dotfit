@@ -1,5 +1,4 @@
 import re
-import warnings
 from pathlib import Path
 
 import numpy as np
@@ -49,11 +48,7 @@ def _ensure_multiplet_ratios(tab, kwargs):
     has_multiplet = 'multiplet' in tab.colnames and np.any(tab['multiplet'] != 0)
     has_ratios = 'line_ratio' in tab.colnames and np.any(tab['line_ratio'] != 1.0)
     if not (has_multiplet and has_ratios):
-        # Use new API
-        filtered = _filter_multiplet_kwargs(kwargs)
-        Te = filtered.get('Te', 1e4)
-        Ne = filtered.get('Ne', 1e2)
-        return compute_line_ratios(assign_multiplets(tab), Te=Te, Ne=Ne)
+        return multiplet_ratios(assign_multiplets(tab), **_filter_multiplet_kwargs(kwargs))
     return tab
 
 
@@ -145,227 +140,6 @@ def _boltzmann_ratios_for_group(group, Te=1e4, default=1.0, verbose=False):
     return I_norm
 
 
-def _compute_boltzmann_ratios(wave_vac, Ek, gu, f, Te):
-    """
-    Compute Boltzmann intensity ratios for permitted lines.
-
-    For permitted lines sharing the same lower level:
-        I ∝ (g_u * f_lu / λ³) * exp(-E_u / kT)
-
-    Line ratios within a multiplet (same lower level):
-        I₁/I₂ = (λ₂/λ₁)³ * (f₁/f₂) * (g_u1/g_u2) * exp[-(E_u1 - E_u2) / kT]
-
-    Parameters
-    ----------
-    wave_vac : array
-        Vacuum wavelengths [Å]
-    Ek : array
-        Upper level energies [eV]
-    gu : array
-        Upper level statistical weights
-    f : array
-        Oscillator strengths
-    Te : float
-        Excitation temperature [K]
-
-    Returns
-    -------
-    ratios : array
-        Normalized intensity ratios (sum=1)
-    """
-    KB_EV = 8.617333262e-5  # Boltzmann constant in eV/K
-
-    wave_vac = np.asarray(wave_vac, dtype=float)
-    Ek = np.asarray(Ek, dtype=float)
-    gu = np.asarray(gu, dtype=float)
-    f = np.asarray(f, dtype=float)
-
-    # Use first line as reference
-    delta_E = Ek - Ek[0]
-
-    weights = (wave_vac[0] / wave_vac) ** 3 * (f / f[0]) * (gu / gu[0]) * np.exp(-delta_E / (KB_EV * Te))
-
-    # Normalize
-    if np.sum(weights) > 0:
-        return weights / np.sum(weights)
-    else:
-        # Fallback to uniform if computation fails
-        return np.ones_like(weights) / len(weights)
-
-
-def _compute_pyneb_ratios(ion, wave_vac, Te, Ne, tolerance=0.1, verbose=False):
-    """
-    Compute emissivity ratios from PyNeb for forbidden/recombination lines.
-
-    Parameters
-    ----------
-    ion : str
-        Ion name (e.g., 'O III', '[O III]', 'H I')
-    wave_vac : array
-        Vacuum wavelengths [Å]
-    Te : float
-        Electron temperature [K]
-    Ne : float
-        Electron density [cm^-3]
-    tolerance : float
-        Wavelength matching tolerance [Å]
-    verbose : bool
-        Print diagnostic information
-
-    Returns
-    -------
-    ratios : array
-        Normalized intensity ratios (max=1), or None if PyNeb fails
-    """
-    try:
-        # Extract atom and level
-        ion_clean = ion.replace('[', '').replace(']', '')
-        atom, level = ion_clean.split(' ')
-        level_int = roman_to_int(level)
-
-        # Use existing emissivity_ratios function
-        ratios = emissivity_ratios(
-            atom,
-            level_int,
-            np.asarray(wave_vac),
-            Te=Te,
-            Ne=Ne,
-            relative=True,  # Normalize to max=1
-            tolerance=tolerance,
-            verbose=verbose,
-        )
-
-        # Check if valid
-        if np.all(np.isnan(ratios)) or np.all(ratios == 0):
-            return None
-
-        return ratios
-
-    except Exception as e:
-        if verbose:
-            print(f"PyNeb failed for {ion}: {e}")
-        return None
-
-
-def _has_atomic_data(group):
-    """Check if group has sufficient atomic data for Boltzmann calculation."""
-    if 'Ek' not in group.colnames or 'wave_vac' not in group.colnames:
-        return False
-
-    # Check for valid Ek values
-    Ek = np.array(group['Ek'], dtype=float)
-    if not np.any(Ek > 0):
-        return False
-
-    # Check for g-values (from gigk)
-    if 'gigk' not in group.colnames:
-        return False
-
-    has_gigk = False
-    for g in group['gigk']:
-        if g and str(g).strip() and '-' in str(g):
-            has_gigk = True
-            break
-
-    if not has_gigk:
-        return False
-
-    # Check for oscillator strengths
-    has_f = False
-    if 'gf' in group.colnames and np.any(np.array(group['gf'], dtype=float) > 0):
-        has_f = True
-    elif 'fik' in group.colnames:
-        has_f = True
-
-    return has_f
-
-
-def _extract_atomic_params(group):
-    """Extract atomic parameters for Boltzmann calculation."""
-    wave_vac = np.array(group['wave_vac'], dtype=float)
-    Ek = np.array(group['Ek'], dtype=float)
-
-    # Extract g_u from gigk
-    gu = []
-    for g in group['gigk']:
-        gi, gu_val = _parse_gigk(g)
-        gu.append(gu_val)
-    gu = np.array(gu)
-
-    # Extract oscillator strengths
-    if 'gf' in group.colnames and np.any(np.array(group['gf'], dtype=float) > 0):
-        gi = []
-        for g in group['gigk']:
-            gi_val, _ = _parse_gigk(g)
-            gi.append(gi_val)
-        gi = np.array(gi)
-        f = np.array(group['gf'], dtype=float) / gi
-    elif 'fik' in group.colnames:
-        f = np.array(group['fik'], dtype=float)
-    else:
-        f = np.ones(len(group))
-
-    return wave_vac, Ek, gu, f
-
-
-def _compute_group_ratios(group, Te, Ne, verbose=False):
-    """
-    Compute ratios for one multiplet group using fallback chain.
-
-    Fallback order:
-    1. PyNeb (for H I, He I/II, and forbidden/semi-forbidden lines)
-    2. Boltzmann (if atomic data available)
-    3. Uniform (last resort)
-
-    Parameters
-    ----------
-    group : Table
-        Lines in the multiplet group
-    Te : float
-        Electron temperature [K]
-    Ne : float
-        Electron density [cm^-3]
-    verbose : bool
-        Print diagnostic information
-
-    Returns
-    -------
-    ratios : array
-        Intensity ratios normalized to max=1
-    method : str
-        Method used: 'single', 'pyneb', 'boltzmann', or 'uniform'
-    """
-    if len(group) <= 1:
-        return np.array([1.0]), 'single'
-
-    ion = group['ion'][0]
-
-    # Try PyNeb for supported ions
-    if _should_use_pyneb(ion, group):
-        ratios = _compute_pyneb_ratios(ion, group['wave_vac'], Te, Ne, tolerance=0.1, verbose=verbose)
-        if ratios is not None and np.any(ratios > 0):
-            # Normalize to max=1
-            return ratios / ratios.max(), 'pyneb'
-
-    # Try Boltzmann for permitted lines with atomic data
-    if _has_atomic_data(group):
-        try:
-            wave_vac, Ek, gu, f = _extract_atomic_params(group)
-            ratios = _compute_boltzmann_ratios(wave_vac, Ek, gu, f, Te)
-            if np.any(ratios > 0):
-                # Normalize to max=1
-                return ratios / ratios.max(), 'boltzmann'
-        except Exception as e:
-            if verbose:
-                print(f"Boltzmann calculation failed for {ion}: {e}")
-
-    # Fallback to uniform
-    n = len(group)
-    if verbose:
-        print(f"Using uniform ratios for {ion} multiplet (n={n})")
-    return np.ones(n) / n, 'uniform'
-
-
 def plot_lines(
     tab: Table,
     wave=None,
@@ -425,10 +199,10 @@ def plot_lines(
     # always recalculate multiplets and line ratios if missing
     if "multiplet" not in linetab.colnames:
         linetab = assign_multiplets(linetab, lower_only=lower_only)
-        linetab = compute_line_ratios(linetab, Te=Te, Ne=1e2)
+        linetab = calculate_multiplet_emissivities(linetab, Te=Te)
 
     if "line_ratio" not in linetab.colnames:
-        linetab = compute_line_ratios(linetab, Te=Te, Ne=1e2)
+        linetab = calculate_multiplet_emissivities(linetab, Te=Te)
 
     # Scalar constants
     c_kms = 299_792.458
@@ -650,7 +424,7 @@ def plot_ion_models(
     if merge_semiforbidden and semiforbidden is not None and len(semiforbidden) > 0:
         permitted = vstack([permitted, semiforbidden])
         permitted = assign_multiplets(permitted, lower_only=True)
-        permitted = compute_line_ratios(permitted, Te=Te, Ne=1e2)
+        permitted = calculate_multiplet_emissivities(permitted, Te=Te)
         semiforbidden = None
 
     plt.figure(figsize=figsize)
@@ -1001,9 +775,9 @@ class EmissionLines:
         return lw, lr
 
     # thin wrapper for calculate_multiplet_ratio
-    # @staticmethod
-    # def multiplet_ratios(*args, **kwargs):
-    #     return multiplet_ratios(*args, **kwargs)
+    @staticmethod
+    def multiplet_ratios(*args, **kwargs):
+        return multiplet_ratios(*args, **kwargs)
 
     def save(self, filename=None):
         if filename is None:
@@ -1670,7 +1444,7 @@ def read_kurucz_table(
     if assign_multiplet and len(tab) > 0:
         tab = assign_multiplets(tab)
         if emissivities:
-            tab = compute_line_ratios(tab, Te=Te, Ne=1e2)
+            tab = calculate_multiplet_emissivities(tab, Te=Te)
 
     return tab
 
@@ -2335,7 +2109,7 @@ def get_line_nist(
         output = assign_multiplets(output, lower_only=multiplet_lower_only, verbose=verbose)
 
     if emissitivies:
-        output = compute_line_ratios(output, Te=Te, Ne=1e2)
+        output = calculate_multiplet_emissivities(output, Te=Te, default=1.0)
 
     return output
 
@@ -2531,89 +2305,6 @@ def assign_multiplets(intab, verbose=False, lower_only=False):
     return tab
 
 
-def compute_line_ratios(
-    tab: Table, Te: float = 1e4, Ne: float = 1e2, normalize: str = 'max', verbose: bool = False
-) -> Table:
-    """
-    Compute intensity ratios for all multiplets in table.
-
-    This is the new simplified API for computing line ratios. It replaces
-    the previous multiplet_ratios() and calculate_multiplet_emissivities() functions.
-
-    Uses a clear fallback chain for each multiplet:
-    1. PyNeb (for H I, He I/II, and forbidden/semi-forbidden lines)
-    2. Boltzmann (for permitted lines with atomic data)
-    3. Uniform (fallback when data is missing)
-
-    Parameters
-    ----------
-    tab : Table
-        Table with 'multiplet' column (from assign_multiplets)
-        Must have columns: 'ion', 'wave_vac', 'multiplet'
-    Te : float
-        Electron temperature [K], default 10,000 K
-    Ne : float
-        Electron density [cm^-3], default 100 cm^-3
-    normalize : str
-        Normalization method: 'max' (strongest=1) or 'sum' (sum=1)
-        Default is 'max' for consistency with previous behavior
-    verbose : bool
-        Print diagnostic information
-
-    Returns
-    -------
-    Table
-        Copy of input table with 'line_ratio' column filled
-
-    Examples
-    --------
-    >>> from dotfit.emission_lines import EmissionLines, assign_multiplets, compute_line_ratios
-    >>> el = EmissionLines()
-    >>> tab = el.get_table('[OIII]')
-    >>> tab = assign_multiplets(tab)
-    >>> tab = compute_line_ratios(tab, Te=10000, Ne=100)
-    >>> print(tab['key', 'wave_vac', 'multiplet', 'line_ratio'])
-    """
-    if 'multiplet' not in tab.colnames:
-        raise ValueError("Table must have 'multiplet' column. Run assign_multiplets() first.")
-
-    out = tab.copy()
-
-    # Add line_ratio column if it doesn't exist
-    if 'line_ratio' not in out.colnames:
-        out['line_ratio'] = 1.0
-
-    # Process each ion separately
-    for ion in np.unique(out['ion']):
-        ion_mask = out['ion'] == ion
-
-        # Process each multiplet within this ion
-        for m in np.unique(out['multiplet'][ion_mask]):
-            if m == 0:
-                # Single lines keep ratio=1.0
-                continue
-
-            mask = ion_mask & (out['multiplet'] == m)
-            group = out[mask]
-
-            # Compute ratios using fallback chain
-            ratios, method = _compute_group_ratios(group, Te, Ne, verbose)
-
-            if verbose:
-                print(f"{ion} multiplet {m}: method={method}, " f"ratios={ratios}, n={len(ratios)}")
-
-            # Apply normalization
-            if normalize == 'sum' and np.sum(ratios) > 0:
-                ratios = ratios / np.sum(ratios)
-            elif normalize == 'max' and np.max(ratios) > 0:
-                ratios = ratios / np.max(ratios)
-
-            # Assign back to table
-            out['line_ratio'][mask] = ratios
-
-    return out
-
-
 def calculate_multiplet_ratio(
     tab,
     ion,
@@ -2686,38 +2377,57 @@ def calculate_multiplet_ratio(
 def multiplet_ratios(tab, Te=1e4, Ne=1e2, tolerance=0.1, relative=True, verbose=False):
     """
     Calculate line intensity ratios for all multiplets in the table.
+    Assumes multiplet column already exists and is populated.
 
-    .. deprecated:: 1.0
-        Use :func:`compute_line_ratios` instead. This function is kept for
-        backward compatibility and will be removed in a future version.
+    Parameters:
+        tab: Table with 'multiplet', 'ion', 'wave_vac' columns already assigned
+        Te: Electron temperature [K]
+        Ne: Electron density [cm^-3]
+        tolerance: Wavelength matching tolerance [Å]
 
-    Parameters
-    ----------
-    tab : Table
-        Table with 'multiplet', 'ion', 'wave_vac' columns already assigned
-    Te : float
-        Electron temperature [K]
-    Ne : float
-        Electron density [cm^-3]
-    tolerance : float
-        Wavelength matching tolerance [Å] (ignored, kept for compatibility)
-    relative : bool
-        Normalize ratios (ignored, kept for compatibility)
-    verbose : bool
-        Print diagnostic information
-
-    Returns
-    -------
-    Table
+    Returns:
         Table with updated 'line_ratio' column
     """
-    warnings.warn(
-        "multiplet_ratios() is deprecated and will be removed in a future version. "
-        "Use compute_line_ratios() instead.",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-    return compute_line_ratios(tab, Te=Te, Ne=Ne, normalize='max', verbose=verbose)
+    if 'multiplet' not in tab.colnames:
+        raise ValueError("Table must have 'multiplet' column. Run assign_multiplets() first.")
+
+    # Add line_ratio column if it doesn't exist
+    if 'line_ratio' not in tab.colnames:
+        tab['line_ratio'] = 0.0
+
+    unique_multiplets = np.unique(tab['multiplet'])
+    #    unique_multiplets = unique_multiplets[unique_multiplets > 0]
+
+    # Calculate ratios for each multiplet, grouped by ion
+    for multiplet_num in unique_multiplets:
+        if multiplet_num == 0:
+            continue
+
+        multiplet_mask = tab['multiplet'] == multiplet_num
+        ions = np.unique(tab['ion'][multiplet_mask])
+
+        for ion in ions:
+            mask = multiplet_mask & (tab['ion'] == ion)
+            if not np.any(mask):
+                continue
+
+            # Calculate ratios
+            ratios, method = calculate_multiplet_ratio(
+                tab,
+                ion,
+                multiplet_num,
+                Te=Te,
+                Ne=Ne,
+                relative=relative,
+                tolerance=tolerance,
+                verbose=verbose,
+                return_method=True,
+            )
+
+            if ratios is not None:
+                tab['line_ratio'][mask] = ratios
+
+    return tab
 
 
 def apply_multiplet_rules(
@@ -2756,12 +2466,12 @@ def apply_multiplet_rules(
 
     if np.any(em_mask):
         em_tab = out[em_mask]
-        em_tab = compute_line_ratios(em_tab, Te=Te_emission, Ne=Ne, verbose=verbose)
+        em_tab = multiplet_ratios(em_tab, Te=Te_emission, Ne=Ne, tolerance=tolerance, verbose=verbose)
         out['line_ratio'][em_mask] = em_tab['line_ratio']
 
     if np.any(abs_mask):
         abs_tab = out[abs_mask]
-        abs_tab = compute_line_ratios(abs_tab, Te=Te_absorption, Ne=1e2, verbose=verbose)
+        abs_tab = calculate_multiplet_emissivities(abs_tab, Te=Te_absorption, verbose=verbose)
         out['line_ratio'][abs_mask] = abs_tab['line_ratio']
 
     if normalize_multiplet and 'multiplet' in out.colnames and 'line_ratio' in out.colnames:
@@ -3132,9 +2842,11 @@ def calculate_multiplet_emissivities(tab, Te=10_000, default=1.0, verbose=False)
     """
     Calculate relative line emissivities for multiplets using optically-thin approximation.
 
-    .. deprecated:: 1.0
-        Use :func:`compute_line_ratios` instead. This function is kept for
-        backward compatibility and will be removed in a future version.
+    For permitted lines sharing the same lower level:
+        I ∝ (g_u * f_lu / λ³) * exp(-E_u / kT)
+
+    Line ratios within a multiplet (same lower level):
+        I₁/I₂ = (λ₂/λ₁)³ * (f₁/f₂) * (g_u1/g_u2) * exp[-(E_u1 - E_u2) / kT]
 
     Parameters
     ----------
@@ -3143,8 +2855,6 @@ def calculate_multiplet_emissivities(tab, Te=10_000, default=1.0, verbose=False)
         and either 'gf' or ('fik' and 'gigk')
     Te : float
         Excitation temperature [K]
-    default : float
-        Default ratio for single lines (ignored, kept for compatibility)
     verbose : bool
         Print diagnostic information
 
@@ -3153,13 +2863,84 @@ def calculate_multiplet_emissivities(tab, Te=10_000, default=1.0, verbose=False)
     Table
         Input table with added 'line_ratio' column (normalized within each multiplet)
     """
-    warnings.warn(
-        "calculate_multiplet_emissivities() is deprecated and will be removed in a future version. "
-        "Use compute_line_ratios() instead.",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-    return compute_line_ratios(tab, Te=Te, Ne=1e2, normalize='max', verbose=verbose)
+    KB_EV = 8.617333262e-5  # Boltzmann constant in eV/K
+
+    tab = tab.copy()
+
+    # Add line_ratio column if it doesn't exist
+    if 'line_ratio' not in tab.colnames:
+        tab['line_ratio'] = default
+    #    if 'line_ratio_method' not in tab.colnames:
+    #        tab['line_ratio_method'] = np.full(len(tab), '', dtype='U16')
+
+    # Extract gi, gu for all rows
+    gi_all = []
+    gu_all = []
+    for g in tab['gigk']:
+        gi, gu = _parse_gigk(g)
+        gi_all.append(gi)
+        gu_all.append(gu)
+
+    gi_all = np.array(gi_all)
+    gu_all = np.array(gu_all)
+
+    # Get oscillator strength f
+    if 'gf' in tab.colnames and np.any(tab['gf'] > 0):
+        f_all = tab['gf'].astype(float) / gi_all
+    elif 'fik' in tab.colnames:
+        f_all = tab['fik'].astype(float)
+    else:
+        if verbose:
+            print("Warning: No 'gf' or 'fik' column found")
+        f_all = np.ones(len(tab))
+
+    # Group by ion and multiplet
+    ion_groups = tab.group_by(['ion', 'multiplet'])
+
+    for group in ion_groups.groups:
+        if len(group) <= 1 or group['multiplet'][0] == 0:
+            continue
+
+        ion = group['ion'][0]
+        multiplet_num = group['multiplet'][0]
+
+        # Get indices in original table
+        mask = (tab['ion'] == ion) & (tab['multiplet'] == multiplet_num)
+        idx = np.where(mask)[0]
+
+        # Extract parameters for this multiplet
+        lam = np.array(group['wave_vac'], dtype=float)  # Å
+        Eu = np.array(group['Ek'], dtype=float)  # eV (upper level energies)
+        gu = gu_all[idx]
+        f = f_all[idx]
+
+        # Calculate relative intensities using energy differences from first line
+        # Reference line (usually lowest energy or first in multiplet)
+        E_ref = Eu[0]
+
+        # I_i / I_ref = (λ_ref/λ_i)³ * (f_i/f_ref) * (g_ui/g_u_ref) * exp[-(E_ui - E_u_ref) / kT]
+        delta_E = Eu - E_ref  # Energy difference from reference
+
+        I_weight = (lam[0] / lam) ** 3 * (f / f[0]) * (gu / gu[0]) * np.exp(-delta_E / (KB_EV * Te))
+
+        # Normalize within multiplet
+        if np.sum(I_weight) > 0:
+            I_norm = I_weight / np.sum(I_weight)
+        else:
+            I_norm = np.zeros_like(I_weight)
+
+        # Assign back to table
+        tab['line_ratio'][idx] = I_norm
+        #        tab['line_ratio_method'][idx] = 'boltzmann'
+
+        if verbose:
+            print(f"\n{ion} multiplet {multiplet_num}:")
+            print(f"  Wavelengths: {lam}")
+            print(f"  Upper energies: {Eu} eV")
+            print(f"  ΔE from ref: {delta_E} eV")
+            print(f"  Relative intensities: {I_norm}")
+
+    return tab
 
 
 # adopted from pyqso
