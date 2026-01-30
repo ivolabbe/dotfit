@@ -2382,8 +2382,6 @@ def multiplet_ratios(tab, Te=1e4, Ne=1e2, tolerance=0.1, verbose=False):
     # Add line_ratio column if it doesn't exist
     if 'line_ratio' not in tab.colnames:
         tab['line_ratio'] = 0.0
-    if 'line_ratio_method' not in tab.colnames:
-        tab['line_ratio_method'] = np.full(len(tab), '', dtype='U16')
 
     unique_multiplets = np.unique(tab['multiplet'])
     #    unique_multiplets = unique_multiplets[unique_multiplets > 0]
@@ -2415,7 +2413,6 @@ def multiplet_ratios(tab, Te=1e4, Ne=1e2, tolerance=0.1, verbose=False):
 
             if ratios is not None:
                 tab['line_ratio'][mask] = ratios
-                tab['line_ratio_method'][mask] = method
 
     return tab
 
@@ -2513,11 +2510,9 @@ def apply_multiplet_rules(
     if verbose:
         has_key = 'key' in out.colnames
         has_term = 'multiplet_term' in out.colnames
-        has_method = 'line_ratio_method' in out.colnames
         for row in out:
             name = row['key'] if has_key else row['ion']
             term = str(row['multiplet_term']) if has_term else ''
-            method = str(row['line_ratio_method']) if has_method else ''
             ratio_val = row['line_ratio'] if 'line_ratio' in out.colnames else np.nan
             if np.ma.is_masked(ratio_val) or np.isnan(ratio_val):
                 ratio_str = 'nan'
@@ -2525,7 +2520,7 @@ def apply_multiplet_rules(
                 ratio_str = f"{float(ratio_val):.6g}"
             print(
                 f"{name}, {float(row['wave_vac']):.3f}, m={int(row['multiplet'])}, "
-                f"term={term}, ratio={ratio_str}, method={method}"
+                f"term={term}, ratio={ratio_str}"
             )
 
     return out
@@ -2872,8 +2867,8 @@ def calculate_multiplet_emissivities(tab, Te=10_000, default=1.0, verbose=False)
     # Add line_ratio column if it doesn't exist
     if 'line_ratio' not in tab.colnames:
         tab['line_ratio'] = default
-    if 'line_ratio_method' not in tab.colnames:
-        tab['line_ratio_method'] = np.full(len(tab), '', dtype='U16')
+    #    if 'line_ratio_method' not in tab.colnames:
+    #        tab['line_ratio_method'] = np.full(len(tab), '', dtype='U16')
 
     # Extract gi, gu for all rows
     gi_all = []
@@ -2933,7 +2928,7 @@ def calculate_multiplet_emissivities(tab, Te=10_000, default=1.0, verbose=False)
 
         # Assign back to table
         tab['line_ratio'][idx] = I_norm
-        tab['line_ratio_method'][idx] = 'boltzmann'
+        #        tab['line_ratio_method'][idx] = 'boltzmann'
 
         if verbose:
             print(f"\n{ion} multiplet {multiplet_num}:")
