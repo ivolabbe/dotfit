@@ -16,6 +16,7 @@ ipython = ">=9,<10"
 astroquery = "^0.4.11"
 pyneb = "^1.1.28"
 ipykernel = "^7.1.0"
+panel = "^1.8.7"
 
 [tool.poetry.group.test.dependencies]
 pytest = "*"
