@@ -97,54 +97,6 @@ def _should_use_pyneb(ion, group):
     return any(c in {'forbidden', 'semi-forbidden'} for c in classes)
 
 
-def _boltzmann_ratios_for_group(group, Te=1e4, default=1.0, verbose=False):
-    if len(group) == 0:
-        return np.array([], dtype=float)
-    if len(group) == 1:
-        return np.array([default], dtype=float)
-
-    KB_EV = 8.617333262e-5  # Boltzmann constant in eV/K
-
-    gi_all = []
-    gu_all = []
-    if 'gigk' in group.colnames:
-        for g in group['gigk']:
-            gi, gu = _parse_gigk(g)
-            gi_all.append(gi)
-            gu_all.append(gu)
-    else:
-        gi_all = [np.nan] * len(group)
-        gu_all = [np.nan] * len(group)
-
-    gi_all = np.array(gi_all)
-    gu_all = np.array(gu_all)
-
-    if 'gf' in group.colnames and np.any(group['gf'] > 0):
-        f_all = group['gf'].astype(float) / gi_all
-    elif 'fik' in group.colnames:
-        f_all = group['fik'].astype(float)
-    else:
-        if verbose:
-            print("Warning: No 'gf' or 'fik' column found")
-        f_all = np.ones(len(group))
-
-    lam = np.array(group['wave_vac'], dtype=float)
-    Eu = np.array(group['Ek'], dtype=float)
-    E_ref = Eu[0]
-    delta_E = Eu - E_ref
-
-    I_weight = (
-        (lam[0] / lam) ** 3 * (f_all / f_all[0]) * (gu_all / gu_all[0]) * np.exp(-delta_E / (KB_EV * Te))
-    )
-
-    if np.sum(I_weight) > 0:
-        I_norm = I_weight / np.sum(I_weight)
-    else:
-        I_norm = np.zeros_like(I_weight)
-
-    return I_norm
-
-
 def _compute_boltzmann_ratios(wave_vac, Ek, gu, f, Te):
     """
     Compute Boltzmann intensity ratios for permitted lines.
@@ -519,7 +471,7 @@ def plot_lines(
 
         if idx.size == 0:
             continue
-        plt.plot(lam[idx], plot_prof[idx], color=color, lw=1.5, ls=linestyle, label=plot_label)
+        plt.plot(lam[idx], plot_prof[idx], color=color, lw=1.5, ls=linestyle, label=plot_label, alpha=0.7)
 
         # Optional vertical markers at line centers
         ymark = np.interp(mu, lam, prof, left=0.0, right=0.0)
@@ -789,13 +741,6 @@ class EmissionLines:
         # Define common line groups
         self.groups = LINE_GROUPS
 
-    # use get_line_nist to add new row
-    # def get_line_nist(ion='H I', wave=[4000,6600], tolerance=1.0, single=False,
-    #                  sortkey='Aki', clear_cache=True, verbose=False):
-    # def add_line(self, ion, **kwargs):
-    #     self.table = vstack([self.table, get_line_nist(ion='H I', **kwargs)])
-    #     self.table.sort('wave_vac')
-
     # static
     @staticmethod
     def search_line_nist(ion, **kwargs):
@@ -873,13 +818,8 @@ class EmissionLines:
         else:
             return ion_tab[match]
 
-    # def replace_ion(self, key, new_wave_mix, new_wave_vac, new_flux_ratio):
-    #     #        self.remove_ion(ion)
-    #     #        self.add_ion(ion, new_wave_mix, new_wave_vac, new_flux_ratio)
-    #     pass
-
-    def plot_lines(self, **kwargs):
-        return plot_lines(self.table, **kwargs)
+    def plot_lines(self, search_key=None, **kwargs):
+        return plot_lines(self.get_table(search_key=search_key, **kwargs), **kwargs)
 
     def plot_ion_models(self, **kwargs):
         return plot_ion_models(**kwargs)
@@ -999,11 +939,6 @@ class EmissionLines:
                 print(k, lw[k], lr[k])
 
         return lw, lr
-
-    # thin wrapper for calculate_multiplet_ratio
-    # @staticmethod
-    # def multiplet_ratios(*args, **kwargs):
-    #     return multiplet_ratios(*args, **kwargs)
 
     def save(self, filename=None):
         if filename is None:
@@ -1817,19 +1752,6 @@ def air_to_vacuum(lambda_air_in):
     #     return lambda_air if lambda_vacuum < 2000 else lambda_vacuum
 
 
-# test vacuum to air by converting to air and back, minus the lambda_vac from lambda_vac= 2000 to 1e5
-# reproduces: https://www.astro.uu.se/valdwiki/Air-to-vacuum%20conversion?action=AttachFile&do=view&target=air2vac.gif
-# reversible to within 1e-8
-def test_vacuum_to_air():
-    import matplotlib.pyplot as plt
-
-    lambda_vac = np.linspace(1000, 1e5, 10000)
-    lambda_air = vacuum_to_air(lambda_vac)
-    lambda_vac_back = air_to_vacuum(lambda_air)
-    plt.semilogx(lambda_vac, lambda_vac_back - lambda_vac)
-    plt.ylim(-2e-8, 2e-8)
-
-
 def roman_to_int(roman):
     roman_map = {
         'I': 1,
@@ -2427,6 +2349,13 @@ def emissivity_ratios(atom, level, wave_vac, Te=1e4, Ne=1e2, relative=False, tol
 
 
 def hydrogen_ratios(intab, wave=[2000, 1e5], Te=1e4, Ne=1e2, tolerance=1.0):
+    """Deprecated: Use compute_line_ratios() instead."""
+    warnings.warn(
+        "hydrogen_ratios() is deprecated and will be removed in a future version. "
+        "Use compute_line_ratios() instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     tab = intab.copy()
     ix = np.where((tab['ion'] == 'H I') & (tab['wave_vac'] > wave[0]) & (tab['wave_vac'] < wave[1]))
     if not 'multiplet' in tab.colnames:
@@ -2669,8 +2598,15 @@ def calculate_multiplet_ratio(
                 raise ValueError("PyNeb returned no valid emissivities")
             method = "pyneb"
         else:
-            ratios = _boltzmann_ratios_for_group(group, Te=Te, default=default, verbose=verbose)
-            method = "boltzmann"
+            # Use Boltzmann statistics for permitted lines
+            if _has_atomic_data(group):
+                wave_vac, Ek, gu, f = _extract_atomic_params(group)
+                ratios = _compute_boltzmann_ratios(wave_vac, Ek, gu, f, Te)
+                method = "boltzmann"
+            else:
+                # No atomic data available, use uniform ratios
+                ratios = np.full(len(group), default)
+                method = "default"
 
     except Exception as e:
         if verbose:
@@ -2819,92 +2755,12 @@ def apply_multiplet_rules(
     return out
 
 
-# def multiplet_ratios(tab, Te=1e4, Ne=1e2, tolerance=1.0):
-#     ion = np.unique(tab['ion'])
-#     # add H I to terms to get doublets / multiplets
-#     # tab['multiplet_key'] = [
-#     #     c + '_' + t for c, t in zip(tab['configuration'], tab['terms'])
-#     #     c + '_' + t for c, t in zip(tab['configuration'], tab['terms'])
-#     # ]
-#     tab['multiplet_key'] = [
-#         c if isinstance(t, np.ma.core.MaskedConstant) else c + '_' + re.sub(r'(\d+)[A-Za-z0-9*]*', r'\1', t)
-#         for c, t in zip(tab['configuration'], tab['terms'])
-#     ]
-
-#     print('multiplet_key', ' -- ', tab['multiplet_key'])
-
-#     grouped_table = tab.group_by(['ion', 'multiplet_key'])
-#     grouped_table['multiplet'] = 0
-#     grouped_table['line_ratio'] = 0.0
-#     multiplet_index = 1
-#     for ig, group in enumerate(grouped_table.groups):
-#         print(
-#             ig,
-#             f"Group: ion={group['ion'][0]}, config={group['multiplet_key'][0]} wlen={len(group['wave_vac'])}",
-#         )
-#         print('GROUP len', len(group))
-
-#         if len(group) > 1:
-#             atom, level = group['ion'][0].replace('[', '').replace(']', '').split(' ')
-#             print('GROUP', atom, level, group['wave_vac'])
-#             er = emissivity_ratios(
-#                 atom, roman_to_int(level), np.asarray(group['wave_vac']), Te=Te, Ne=Ne, tolerance=tolerance
-#             )
-
-#             start, end = grouped_table.groups.indices[ig], grouped_table.groups.indices[ig + 1]
-#             grouped_table['multiplet'][start:end] = multiplet_index
-#             grouped_table['line_ratio'][start:end] = er
-#             multiplet_index += 1
-#         else:
-#             print('SKIP', group['ion'][0], group['multiplet_key'][0])
-
-#     #    grouped_table = hydrogen_ratios(grouped_table,  Te=Te, Ne=Ne, tolerance=tolerance)
-#     #    grouped_table.remove_columns(['multiplet_key'])
-#     grouped_table.sort('wave_vac')
-
-#     return grouped_table
-
-
-# obsolete get from NIST
-# def hydrogen_lines(
-#         tab_input='/Users/ivo/Desktop/current/agn/agn/data/emission_lines/table_4_wiese_2009.csv',
-#         ndigits=3):
-#     htab = Table.read(tab_input)
-#     htab['references'] = 'W09'
-
-#     #transition -> configuration
-#     #lambda_vac, Ei, Ek, loggf
-#     for c in ['wave_air', 'wave_vac', 'Ei', 'Ek', 'loggf']:
-#         htab[c] = np.char.replace(htab[c].data, ' ', '')
-
-#     # replace cm^-1 with Angstrom
-#     htab['wave_vac'] = [
-#         round(1.0 / float(r.split('cm')[0].replace(' ', '')) *
-#               u.cm.to(u.Angstrom), ndigits)  # from cm^-1 to Angstrom
-#         if 'cm' in r else r for r in htab['wave_vac'].data
-#     ]
-
-#     # replace cm^-1 with eV
-#     for c in ['Ei', 'Ek']:
-#         htab[c] = [
-#             round(float(r) * 1.239841e-4, ndigits) for r in htab[c].data
-#         ]
-
-#     for c in ['wave_air', 'wave_vac', 'Aki', 'loggf']:
-#         htab[c] = htab[c].astype(float)
-
-#     return htab
-
-# const.h * const.c / const.e * 106632.158
-# E(eV) = h*c/e * E(cm-1)
-#      = 1.2398419843320026e-4 * E(cm-1)
-# * 1.2398419843320026e-4
-# (1/5331.596 << u.cm).to(u.angstrom)
-
-
 def add_hydrogen_entries(emission_table, hydrogen_table, tolerance=0.27):
     """
     Replace existing hydrogen entries in the emission line table with entries from the hydrogen table.
+
+    .. deprecated:: 1.0
+        This function is deprecated and will be removed in a future version.
 
     Parameters:
         emission_table (Table): The original emission line table.
@@ -2914,6 +2770,11 @@ def add_hydrogen_entries(emission_table, hydrogen_table, tolerance=0.27):
     Returns:
         Table: The updated emission line table.
     """
+    warnings.warn(
+        "add_hydrogen_entries() is deprecated and will be removed in a future version.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
 
     # Mask to mark rows for removal in the emission table
     remove_index = []
@@ -2950,6 +2811,11 @@ def generate_line_table(
     tab_input='/Users/ivo/Desktop/current/agn/agn/data/emission_lines/emission_lines.csv', ndigits=3
 ):
     """Deprecated legacy generator retained for compatibility."""
+    warnings.warn(
+        "generate_line_table() is deprecated and will be removed in a future version.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     tab = Table.read(tab_input)
 
     # add Aki column for transition probabilities
@@ -3010,6 +2876,11 @@ def generate_line_table(
 
 def add_grizli_lines(tab):
     """Deprecated legacy helper retained for compatibility."""
+    warnings.warn(
+        "add_grizli_lines() is deprecated and will be removed in a future version.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     # no match HeII-5412 H F [5412.5] nearest [FeVI]-5426 5425.728 # not in NIST
     # no match MgII M M [2799.117] nearest MgII-2796 2796.352 -> [MgII]-2803 already in table
     # no match SiIV+OIV-1398 S O [1398.0] nearest OIV]-1397 1397.232 -> [OIV]-1398 already in table
@@ -3038,6 +2909,11 @@ def add_grizli_lines(tab):
 
 def compare_grizli_entries(tab, tolerance=1.0):
     """Deprecated legacy helper retained for compatibility."""
+    warnings.warn(
+        "compare_grizli_entries() is deprecated and will be removed in a future version.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     from . import models
 
     lw, lr = models.get_line_wavelengths()
@@ -3071,6 +2947,11 @@ def compare_grizli_entries(tab, tolerance=1.0):
 # only consider lists with <= max_len
 def find_nearest_key(lw_dict, value, min_len=1, max_len=3, **kwargs):
     """Deprecated legacy helper retained for compatibility."""
+    warnings.warn(
+        "find_nearest_key() is deprecated and will be removed in a future version.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     singledict = single_line_dict(lw_dict, min_len=1, max_len=3, atol=0.1)
     #    print(singledict['OI-6302'])
     #    singledict = {k: v[0] for k, v in dictionary.items() if len(v) >= min_len and len(v) <= max_len}
@@ -3080,6 +2961,11 @@ def find_nearest_key(lw_dict, value, min_len=1, max_len=3, **kwargs):
 
 def single_line_dict(lw_dict, min_len=1, max_len=3, atol=0.1, verbose=False):
     """Deprecated legacy helper retained for compatibility."""
+    warnings.warn(
+        "single_line_dict() is deprecated and will be removed in a future version.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     singledict = {k: [v[0]] for k, v in lw_dict.items() if len(v) == 1}
     sdv = np.array(list(singledict.values()))
     for k, v in lw_dict.items():
@@ -3095,16 +2981,32 @@ def single_line_dict(lw_dict, min_len=1, max_len=3, atol=0.1, verbose=False):
 
 def get_line_keys(lw, line_complex, **kwargs):
     """Deprecated legacy helper retained for compatibility."""
+    warnings.warn(
+        "get_line_keys() is deprecated and will be removed in a future version.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     return [find_nearest_key(lw, w, **kwargs) for w in lw[line_complex]]
 
 
 def get_line_wavelengths(multiplet=True):
     """Deprecated legacy helper retained for compatibility."""
+    warnings.warn(
+        "get_line_wavelengths() is deprecated and will be removed in a future version. "
+        "Use EmissionLines().get_line_wavelengths() instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     return EmissionLines().get_line_wavelengths(multiplet=multiplet)
 
 
 def get_line_list():
     """Deprecated legacy helper retained for compatibility."""
+    warnings.warn(
+        "get_line_list() is deprecated and will be removed in a future version.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     lw, lr = get_line_wavelengths()
     ln = {k: get_line_keys(lw, k) for k in lw}
     return lw, lr, ln
@@ -3112,6 +3014,11 @@ def get_line_list():
 
 def unique_lines():
     """Deprecated legacy helper retained for compatibility."""
+    warnings.warn(
+        "unique_lines() is deprecated and will be removed in a future version.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     lw, lr = get_line_wavelengths()
     uw = list(set([w for k in lw for w in lw[k]]))
     uw.sort()
@@ -3121,6 +3028,9 @@ def unique_lines():
 
 def cdf(wave, flux):
     """Deprecated legacy helper retained for compatibility."""
+    warnings.warn(
+        "cdf() is deprecated and will be removed in a future version.", DeprecationWarning, stacklevel=2
+    )
     norm = np.trapezoid(flux, wave)
     if norm == 0:
         return np.zeros_like(wave)
