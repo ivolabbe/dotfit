@@ -16,6 +16,7 @@ TODO: f_lambda/f_nu flux unit selector feature (parked for later debugging)
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -150,10 +151,12 @@ class LineExplorer:
         - Dictionary mapping spectrum names to spectrum data (each with 'wave' and 'flux' keys)
         - Single filename to load from DJA
         - List of filenames to load from DJA
-    emission_lines : astropy.table.Table or str
+    emission_lines : astropy.table.Table or str or list[Table] or list[str]
         Either:
         - Emission line catalog as astropy Table (from EmissionLines.table)
         - Path to CSV file containing emission line catalog
+        - List of Tables (multiple catalogs)
+        - List of CSV file paths (multiple catalogs)
     redshift : float, optional
         Redshift for converting rest-frame to observed wavelengths
     object_name : str, optional
@@ -190,7 +193,7 @@ class LineExplorer:
     def __init__(
         self,
         spectrum: dict | str | list[str],
-        emission_lines: Table | str,
+        emission_lines: Table | str | list[Table] | list[str],
         redshift: float = 0,
         object_name: str = "",
         debug: bool = False,
@@ -207,6 +210,7 @@ class LineExplorer:
         self.object_name = object_name
         self.debug = debug
         self.max_H_series = max_H_series
+        self.selected_lines_csv_path = selected_lines_csv  # Remember where we loaded from
 
         # Handle different spectrum input types
         if isinstance(spectrum, dict):
@@ -231,79 +235,46 @@ class LineExplorer:
             raise TypeError(f"spectrum must be dict, str, or list, not {type(spectrum)}")
 
         # Handle different emission_lines input types
+        # Support single catalog or list of catalogs
+        self.emission_catalogs = {}  # Dict mapping catalog name to Table
+
         if isinstance(emission_lines, Table):
-            # Direct Table input
-            self.emission_lines = emission_lines
+            # Direct Table input (single catalog)
+            self.emission_catalogs['default'] = emission_lines
         elif isinstance(emission_lines, str):
-            # Load from CSV file
+            # Load from CSV file (single catalog)
             logger.info(f"Loading emission lines from {emission_lines}")
-            self.emission_lines = Table.read(emission_lines, format='csv')
-            logger.info(f"Loaded {len(self.emission_lines)} emission lines from CSV")
+            table = Table.read(emission_lines, format='csv')
+            catalog_name = Path(emission_lines).stem  # Use filename without extension as catalog name
+            self.emission_catalogs[catalog_name] = table
+            logger.info(f"Loaded {len(table)} emission lines from {catalog_name}")
+        elif isinstance(emission_lines, list):
+            # List of Tables or list of CSV paths (multiple catalogs)
+            for i, item in enumerate(emission_lines):
+                if isinstance(item, Table):
+                    catalog_name = f'catalog_{i+1}'
+                    self.emission_catalogs[catalog_name] = item
+                    logger.info(f"Added catalog {catalog_name} with {len(item)} lines")
+                elif isinstance(item, str):
+                    logger.info(f"Loading emission lines from {item}")
+                    table = Table.read(item, format='csv')
+                    catalog_name = Path(item).stem  # Use filename without extension
+                    self.emission_catalogs[catalog_name] = table
+                    logger.info(f"Loaded {len(table)} emission lines from {catalog_name}")
+                else:
+                    raise TypeError(f"List items must be Table or str, not {type(item)}")
+            if len(self.emission_catalogs) == 0:
+                raise ValueError("emission_lines list is empty")
         else:
-            raise TypeError(f"emission_lines must be Table or str, not {type(emission_lines)}")
+            raise TypeError(f"emission_lines must be Table, str, or list, not {type(emission_lines)}")
 
-        # Filter out high hydrogen transitions (H16, H17, etc.) for ALL series
-        # This applies to Balmer, Paschen, Lyman, Brackett, Pfund, and any other H series
-        if max_H_series is not None and 'key' in self.emission_lines.colnames:
-            mask = np.ones(len(self.emission_lines), dtype=bool)
-            for i, key in enumerate(self.emission_lines['key']):
-                h_num = None
+        # Set initial catalog (first one in the dict)
+        self.current_catalog_name = list(self.emission_catalogs.keys())[0]
+        self.emission_lines = self.emission_catalogs[self.current_catalog_name]
+        logger.info(f"Initial catalog: {self.current_catalog_name} ({len(self.emission_lines)} lines)")
 
-                # Try different hydrogen line key formats:
-                # 1. "H16", "H17", "H16-Balmer", "H16-Paschen", etc.
-                if key.startswith('H') and len(key) > 1:
-                    try:
-                        num_str = key[1:].split('-')[0].split('_')[0]
-                        if num_str.isdigit():
-                            h_num = int(num_str)
-                    except (ValueError, IndexError):
-                        pass
-
-                # 2. "Pa16", "Pa17" (Paschen)
-                elif key.startswith('Pa') and len(key) > 2:
-                    try:
-                        num_str = key[2:].split('-')[0].split('_')[0]
-                        if num_str.isdigit():
-                            h_num = int(num_str)
-                    except (ValueError, IndexError):
-                        pass
-
-                # 3. "Ly16", "Ly17" (Lyman)
-                elif key.startswith('Ly') and len(key) > 2:
-                    try:
-                        num_str = key[2:].split('-')[0].split('_')[0]
-                        if num_str.isdigit():
-                            h_num = int(num_str)
-                    except (ValueError, IndexError):
-                        pass
-
-                # 4. "Br16", "Br17" (Brackett)
-                elif key.startswith('Br') and len(key) > 2:
-                    try:
-                        num_str = key[2:].split('-')[0].split('_')[0]
-                        if num_str.isdigit():
-                            h_num = int(num_str)
-                    except (ValueError, IndexError):
-                        pass
-
-                # 5. "Pf16", "Pf17" (Pfund)
-                elif key.startswith('Pf') and len(key) > 2:
-                    try:
-                        num_str = key[2:].split('-')[0].split('_')[0]
-                        if num_str.isdigit():
-                            h_num = int(num_str)
-                    except (ValueError, IndexError):
-                        pass
-
-                # Filter out if transition number exceeds maximum
-                if h_num is not None and h_num > max_H_series:
-                    mask[i] = False
-
-            original_len = len(self.emission_lines)
-            self.emission_lines = self.emission_lines[mask]
-            filtered_count = original_len - len(self.emission_lines)
-            if filtered_count > 0:
-                logger.info(f"Filtered out {filtered_count} hydrogen transitions (all series) beyond H{max_H_series}")
+        # Apply hydrogen series filtering to initial catalog
+        self.emission_lines = self._filter_hydrogen_series(self.emission_lines)
 
         # Apply spectrum scaling ONCE at initialization
         # This modifies spectrum_dict in-place, scaling all spectra to reference
@@ -576,6 +547,86 @@ class LineExplorer:
                 occupied_ranges.append((label_min, label_max))
 
         return visible_labels
+
+    def _filter_hydrogen_series(self, table: Table) -> Table:
+        """Filter out high hydrogen transitions from emission line table.
+
+        Parameters
+        ----------
+        table : astropy.table.Table
+            Emission line table to filter
+
+        Returns
+        -------
+        astropy.table.Table
+            Filtered table with high H transitions removed
+        """
+        # Filter out high hydrogen transitions (H16, H17, etc.) for ALL series
+        # This applies to Balmer, Paschen, Lyman, Brackett, Pfund, and any other H series
+        if self.max_H_series is None or 'key' not in table.colnames:
+            return table
+
+        mask = np.ones(len(table), dtype=bool)
+        for i, key in enumerate(table['key']):
+            h_num = None
+
+            # Try different hydrogen line key formats:
+            # 1. "H16", "H17", "H16-Balmer", "H16-Paschen", etc.
+            if key.startswith('H') and len(key) > 1:
+                try:
+                    num_str = key[1:].split('-')[0].split('_')[0]
+                    if num_str.isdigit():
+                        h_num = int(num_str)
+                except (ValueError, IndexError):
+                    pass
+
+            # 2. "Pa16", "Pa17" (Paschen)
+            elif key.startswith('Pa') and len(key) > 2:
+                try:
+                    num_str = key[2:].split('-')[0].split('_')[0]
+                    if num_str.isdigit():
+                        h_num = int(num_str)
+                except (ValueError, IndexError):
+                    pass
+
+            # 3. "Ly16", "Ly17" (Lyman)
+            elif key.startswith('Ly') and len(key) > 2:
+                try:
+                    num_str = key[2:].split('-')[0].split('_')[0]
+                    if num_str.isdigit():
+                        h_num = int(num_str)
+                except (ValueError, IndexError):
+                    pass
+
+            # 4. "Br16", "Br17" (Brackett)
+            elif key.startswith('Br') and len(key) > 2:
+                try:
+                    num_str = key[2:].split('-')[0].split('_')[0]
+                    if num_str.isdigit():
+                        h_num = int(num_str)
+                except (ValueError, IndexError):
+                    pass
+
+            # 5. "Pf16", "Pf17" (Pfund)
+            elif key.startswith('Pf') and len(key) > 2:
+                try:
+                    num_str = key[2:].split('-')[0].split('_')[0]
+                    if num_str.isdigit():
+                        h_num = int(num_str)
+                except (ValueError, IndexError):
+                    pass
+
+            # Filter out if transition number exceeds maximum
+            if h_num is not None and h_num > self.max_H_series:
+                mask[i] = False
+
+        original_len = len(table)
+        filtered_table = table[mask]
+        filtered_count = original_len - len(filtered_table)
+        if filtered_count > 0:
+            logger.info(f"Filtered out {filtered_count} hydrogen transitions (all series) beyond H{self.max_H_series}")
+
+        return filtered_table
 
     def _apply_spectrum_scaling(self) -> None:
         """Apply spectrum scaling ONCE at initialization.
@@ -925,59 +976,54 @@ class LineExplorer:
             )
             overlays.append(vline)
 
-            # Create hover points spanning the full normalized flux range (0 to ~1.0)
-            # This allows hover to work at any y-coordinate
-            # Use more points and cover a wider range for better hover detection
-            for y_pos in [0.0, 0.15, 0.3, 0.45, 0.6, 0.75, 0.9, 1.05]:  # 8 positions from 0 to above 1.0
-                tooltip_dict = {
-                    'x': wave,
-                    'y': y_pos,
-                    'Line': key,
-                    'Ion': ion,
-                    'Wave': f"{wave:.2f}",
-                }
+            # Create invisible vertical segment for hover detection spanning full y-range
+            # This provides continuous hover trigger at this x-position regardless of y
+            tooltip_dict = {
+                'x0': wave,
+                'y0': -0.5,  # Bottom of hover region
+                'x1': wave,
+                'y1': 2.0,   # Top of hover region (well above typical flux range)
+                'Line': key,
+                'Ion': ion,
+                'Wave': f"{wave:.2f}",
+            }
 
-                # Add other columns if available
-                if 'gf' in row.colnames and not np.isnan(row['gf']):
-                    tooltip_dict['gf'] = f"{row['gf']:.2e}"
-                else:
-                    tooltip_dict['gf'] = 'N/A'
+            # Add other columns if available
+            if 'gf' in row.colnames and not np.isnan(row['gf']):
+                tooltip_dict['gf'] = f"{row['gf']:.2e}"
+            else:
+                tooltip_dict['gf'] = 'N/A'
 
-                if 'Aki' in row.colnames and not np.isnan(row['Aki']):
-                    tooltip_dict['Aki'] = f"{row['Aki']:.2e}"
-                else:
-                    tooltip_dict['Aki'] = 'N/A'
+            if 'Aki' in row.colnames and not np.isnan(row['Aki']):
+                tooltip_dict['Aki'] = f"{row['Aki']:.2e}"
+            else:
+                tooltip_dict['Aki'] = 'N/A'
 
-                if 'Ei' in row.colnames and not np.isnan(row['Ei']):
-                    tooltip_dict['Ei'] = f"{row['Ei']:.2f}"
-                else:
-                    tooltip_dict['Ei'] = 'N/A'
+            if 'Ei' in row.colnames and not np.isnan(row['Ei']):
+                tooltip_dict['Ei'] = f"{row['Ei']:.2f}"
+            else:
+                tooltip_dict['Ei'] = 'N/A'
 
-                # Try both 'Ek' and 'El' (upper level energy)
-                if 'Ek' in row.colnames and not np.isnan(row['Ek']):
-                    tooltip_dict['Ek'] = f"{row['Ek']:.2f}"
-                elif 'El' in row.colnames and not np.isnan(row['El']):
-                    tooltip_dict['Ek'] = f"{row['El']:.2f}"
-                else:
-                    tooltip_dict['Ek'] = 'N/A'
+            # Try both 'Ek' and 'El' (upper level energy)
+            if 'Ek' in row.colnames and not np.isnan(row['Ek']):
+                tooltip_dict['Ek'] = f"{row['Ek']:.2f}"
+            elif 'El' in row.colnames and not np.isnan(row['El']):
+                tooltip_dict['Ek'] = f"{row['El']:.2f}"
+            else:
+                tooltip_dict['Ek'] = 'N/A'
 
-                hover_data.append(tooltip_dict)
+            hover_data.append(tooltip_dict)
 
-        # Create scatter points for hover tooltips
-        # Need to be somewhat visible for hover to work (alpha=0 disables hover!)
+        # Create invisible vertical segments for hover tooltips
+        # These span the full y-range at each line's x-position
+        # Using custom HoverTool with mode='vline' to trigger on x-coordinate only
         if hover_data:
-            hover_points = hv.Points(
-                hover_data,
-                kdims=['x', 'y'],
-                vdims=['Line', 'Ion', 'Wave', 'gf', 'Aki', 'Ei', 'Ek']
-            ).opts(
-                size=20,  # Larger for easier hover detection
-                alpha=0.02,  # Nearly invisible but still renders (0.0 disables hover!)
-                color='white',
-                line_alpha=0,  # No outline
-                tools=['hover'],
-                hover_fill_alpha=0.4,  # Show on hover
-                hover_tooltips=[
+            from bokeh.models import HoverTool
+
+            # Create custom hover tool with vline mode (triggers on x-position only)
+            hover_tool = HoverTool(
+                mode='vline',
+                tooltips=[
                     ('Line', '@Line'),
                     ('Ion', '@Ion'),
                     ('λ (Å)', '@Wave'),
@@ -985,9 +1031,20 @@ class LineExplorer:
                     ('Aki', '@Aki'),
                     ('Ei (eV)', '@Ei'),
                     ('Ek (eV)', '@Ek'),
-                ],
+                ]
             )
-            overlays.append(hover_points)
+
+            hover_segments = hv.Segments(
+                hover_data,
+                kdims=['x0', 'y0', 'x1', 'y1'],
+                vdims=['Line', 'Ion', 'Wave', 'gf', 'Aki', 'Ei', 'Ek']
+            ).opts(
+                line_width=1,  # Thin invisible line
+                alpha=0.0,  # Completely invisible
+                color='white',
+                tools=[hover_tool],  # Use custom hover tool with vline mode
+            )
+            overlays.append(hover_segments)
 
         return hv.Overlay(overlays)
 
@@ -1068,7 +1125,7 @@ class LineExplorer:
 
         # Position each label individually just above the spectrum at that wavelength
         label_data = []
-        label_offset = 0.10  # Fixed offset in normalized flux space (doubled for visibility)
+        label_offset = 0.15  # Fixed offset in normalized flux space
 
         # Determine maximum label position based on visible data
         # When zoomed in, labels should be at (window_max - offset) to stay visible
@@ -1236,6 +1293,19 @@ class LineExplorer:
         self.selected_spectra = initial_selection
         self.spectrum_selector.param.watch(self._on_spectrum_change, 'value')
 
+        # Catalog selector (only shown if multiple catalogs)
+        if len(self.emission_catalogs) > 1:
+            catalog_options = list(self.emission_catalogs.keys())
+            self.catalog_selector = pn.widgets.RadioBoxGroup(
+                name='Emission Line Catalog',
+                options=catalog_options,
+                value=self.current_catalog_name,
+                inline=False,  # Vertical layout
+            )
+            self.catalog_selector.param.watch(self._on_catalog_change, 'value')
+        else:
+            self.catalog_selector = None
+
         # Selected lines counter
         self.selected_counter = pn.widgets.Button(
             name='0 lines selected',
@@ -1252,9 +1322,16 @@ class LineExplorer:
             height=200,  # Fixed height
         )
 
-        # Save button
+        # Save button - show filename if loaded from CSV
+        if self.selected_lines_csv_path:
+            # Show just the filename (not full path) in button
+            csv_filename = Path(self.selected_lines_csv_path).name
+            button_label = f'Save to {csv_filename}'
+        else:
+            button_label = 'Save to CSV'
+
         self.save_button = pn.widgets.Button(
-            name='Save to CSV',
+            name=button_label,
             button_type='success',
         )
         self.save_button.on_click(self._on_save_csv)
@@ -1887,6 +1964,50 @@ class LineExplorer:
             # Trigger plot update to show shifted spectrum
             self._update_plot_simple()
 
+    def _on_catalog_change(self, event) -> None:
+        """Callback for catalog selector change.
+
+        Parameters
+        ----------
+        event : param.Event
+            Parameter change event
+        """
+        new_catalog = event.new
+        if new_catalog == self.current_catalog_name:
+            return  # No change
+
+        if self.debug:
+            print(f"📚 Catalog change: {self.current_catalog_name} -> {new_catalog}")
+
+        logger.info(f"Catalog change: {self.current_catalog_name} -> {new_catalog}")
+
+        old_catalog_name = self.current_catalog_name
+        self.current_catalog_name = new_catalog
+
+        # Switch to new catalog (apply hydrogen filtering)
+        logger.info(f"Switching from catalog '{old_catalog_name}' to '{new_catalog}'")
+        self.emission_lines = self._filter_hydrogen_series(
+            self.emission_catalogs[new_catalog].copy()
+        )
+        logger.info(f"New catalog has {len(self.emission_lines)} lines after filtering")
+
+        # Re-extract unique ions from the new catalog
+        self._extract_unique_ions()
+
+        # Reset visible ions to include all ions from new catalog
+        self.visible_ions = set(self.unique_ions)
+        if 'H I' in self.unique_ions:
+            self.visible_ions.add('H I')
+
+        # Update ion checkboxes (different catalog may have different ions)
+        # Must reset the creation flag to allow recreation
+        self._checkboxes_created = False
+        self._create_ion_checkboxes()
+
+        # Trigger plot update
+        logger.info(f"Triggering plot update for catalog '{new_catalog}'")
+        self._update_plot_simple()
+
     def _on_yscale_change(self, event) -> None:
         """Callback for y-axis scale change.
 
@@ -1917,7 +2038,8 @@ class LineExplorer:
     def _on_save_csv(self, event) -> None:
         """Callback for save to CSV button.
 
-        Saves to <object_name>-<date>.csv format.
+        If loaded from CSV, saves back to the same file.
+        Otherwise, saves to <object_name>-<date>.csv format.
 
         Parameters
         ----------
@@ -1939,17 +2061,24 @@ class LineExplorer:
 
         table = Table([keys, ions, waves], names=['key', 'ion', 'wave_vac'])
 
-        # Generate filename: <object_name>-<date>.csv
-        date_str = datetime.datetime.now().strftime('%Y%m%d')
-        # Clean object name (replace spaces/special chars with underscores)
-        object_name_clean = self.object_name.replace(' ', '_').replace('/', '_').replace('\\', '_')
-        if not object_name_clean:
-            object_name_clean = 'selected_lines'
-        filename = f'{object_name_clean}-{date_str}.csv'
+        # Determine filename
+        if self.selected_lines_csv_path:
+            # Save back to the same file we loaded from
+            filename = self.selected_lines_csv_path
+            logger.info(f"Saving back to original file: {filename}")
+        else:
+            # Generate new filename: <object_name>-<date>.csv
+            date_str = datetime.datetime.now().strftime('%Y%m%d')
+            # Clean object name (replace spaces/special chars with underscores)
+            object_name_clean = self.object_name.replace(' ', '_').replace('/', '_').replace('\\', '_')
+            if not object_name_clean:
+                object_name_clean = 'selected_lines'
+            filename = f'{object_name_clean}-{date_str}.csv'
+            logger.info(f"Saving to new file: {filename}")
 
         # Save
         table.write(filename, format='csv', overwrite=True)
-        logger.info(f"Saved {len(self.selected_lines)} lines to {filename}")
+        logger.info(f"✓ Saved {len(self.selected_lines)} lines to {filename}")
 
     def _load_selected_lines_from_csv(self, csv_path: str) -> None:
         """Load previously selected lines from a CSV file.
@@ -1962,17 +2091,27 @@ class LineExplorer:
         try:
             # Load CSV
             saved_table = Table.read(csv_path, format='csv')
-            logger.info(f"Loading {len(saved_table)} lines from {csv_path}")
+            logger.info(f"Loading {len(saved_table)} lines from {csv_path}...")
 
-            # Add each line from the CSV
+            # Add each line from the CSV WITHOUT updating UI (batch mode)
             if 'key' in saved_table.colnames:
+                loaded_count = 0
                 for row in saved_table:
                     line_key = row['key']
                     try:
-                        self.add_line(line_key)
+                        # Use update_ui=False to skip UI updates during batch loading
+                        self.add_line(line_key, update_ui=False)
+                        loaded_count += 1
                     except Exception as e:
                         logger.warning(f"Could not add line {line_key}: {e}")
-                logger.info(f"Loaded {len(self.selected_lines)} lines from CSV")
+
+                # Update display ONCE after all lines are added
+                self._update_selected_counter()
+                self.selected_table.value = self._get_selected_table_data()
+                # Update plot to show selected lines
+                self._update_plot_simple()
+
+                logger.info(f"✓ Loaded {loaded_count}/{len(saved_table)} lines from CSV")
             else:
                 logger.error(f"CSV file {csv_path} does not have 'key' column")
 
@@ -1999,26 +2138,29 @@ class LineExplorer:
             csv_data = io.BytesIO(event.new)
             saved_table = Table.read(csv_data, format='csv')
 
-            logger.info(f"Loading {len(saved_table)} lines from uploaded CSV")
+            logger.info(f"Loading {len(saved_table)} lines from uploaded CSV...")
 
             # Clear current selection first
             self.selected_lines = []
 
-            # Add each line from the CSV
+            # Add each line from the CSV WITHOUT updating UI (batch mode)
             if 'key' in saved_table.colnames:
+                loaded_count = 0
                 for row in saved_table:
                     line_key = row['key']
                     try:
-                        self.add_line(line_key)
+                        # Use update_ui=False to skip UI updates during batch loading
+                        self.add_line(line_key, update_ui=False)
+                        loaded_count += 1
                     except Exception as e:
                         logger.warning(f"Could not add line {line_key}: {e}")
 
-                # Update display
+                # Update display ONCE after all lines are added
                 self._update_selected_counter()
                 self.selected_table.value = self._get_selected_table_data()
                 self._update_plot_simple()
 
-                logger.info(f"Loaded {len(self.selected_lines)} lines from CSV")
+                logger.info(f"✓ Loaded {loaded_count}/{len(saved_table)} lines from CSV")
             else:
                 logger.error("CSV file does not have 'key' column")
 
@@ -2070,38 +2212,74 @@ class LineExplorer:
         n = len(self.selected_lines)
         self.selected_counter.name = f'{n} line{"s" if n != 1 else ""} selected'
 
-    def add_line(self, line_key: str) -> None:
+    def add_line(self, line_key: str, update_ui: bool = True) -> None:
         """Add a line to the selection.
 
         Parameters
         ----------
         line_key : str
             Line key to add
+        update_ui : bool, optional
+            If True, update UI and plot after adding. Set to False for batch operations.
+            Default is True.
         """
-        # Find line in table
-        mask = self.emission_lines['key'] == line_key
-        if not any(mask):
-            logger.warning(f"Line {line_key} not found in catalog")
-            return
-
         # Check if already selected
         if any(line['key'] == line_key for line in self.selected_lines):
-            logger.info(f"Line {line_key} already selected")
+            logger.debug(f"Line {line_key} already selected")
             return
 
-        # Add to selected lines
-        row = self.emission_lines[mask][0]
-        line_dict = {col: row[col] for col in ['key', 'ion', 'wave_vac']}
-        self.selected_lines.append(line_dict)
+        # Find line in current catalog first
+        mask = self.emission_lines['key'] == line_key
+        if any(mask):
+            # Line found in current catalog
+            row = self.emission_lines[mask][0]
+            # Convert to native Python types to avoid NaN display issues
+            line_dict = {
+                'key': str(row['key']),
+                'ion': str(row['ion']),
+                'wave_vac': float(row['wave_vac'])
+            }
+            self.selected_lines.append(line_dict)
 
-        # Update UI
-        self._update_selected_counter()
-        self.selected_table.value = self._get_selected_table_data()
+            # Only update UI if requested (for batch operations, skip updates)
+            if update_ui:
+                self._update_selected_counter()
+                self.selected_table.value = self._get_selected_table_data()
+                self._update_plot_simple()
+                logger.info(f"Added line {line_key} to selection")
+            else:
+                logger.debug(f"Added line {line_key} to selection (no UI update)")
+        else:
+            # Line not in current catalog, search other catalogs
+            found_in_other_catalog = False
+            for catalog_name, catalog_table in self.emission_catalogs.items():
+                if catalog_name == self.current_catalog_name:
+                    continue  # Already checked this one
 
-        # Update plot to show thicker line
-        self._update_plot_simple()
+                # Apply hydrogen filtering to the catalog before searching
+                filtered_catalog = self._filter_hydrogen_series(catalog_table.copy())
+                mask = filtered_catalog['key'] == line_key
+                if any(mask):
+                    row = filtered_catalog[mask][0]
+                    line_dict = {
+                        'key': str(row['key']),
+                        'ion': str(row['ion']),
+                        'wave_vac': float(row['wave_vac'])
+                    }
+                    self.selected_lines.append(line_dict)
+                    logger.info(f"Added line {line_key} from catalog '{catalog_name}' (not in current catalog)")
+                    found_in_other_catalog = True
+                    break
 
-        logger.info(f"Added line {line_key} to selection")
+            if not found_in_other_catalog:
+                logger.warning(f"Line {line_key} not found in any catalog")
+                return
+
+            # Update UI if requested (even if line not in current catalog)
+            if update_ui:
+                self._update_selected_counter()
+                self.selected_table.value = self._get_selected_table_data()
+                # Don't update plot since line won't be visible in current catalog anyway
 
     def remove_line(self, line_key: str) -> None:
         """Remove a line from the selection.
@@ -2138,15 +2316,29 @@ class LineExplorer:
             sizing_mode='stretch_both',
         )
 
-        # Column 2: Controls (redshift, scale, spectrum, ion filters)
-        col2_controls = pn.Column(
+        # Column 2: Controls (redshift, scale, spectrum, catalog, ion filters)
+        col2_widgets = [
             pn.pane.Markdown("### Settings"),
             self.redshift_input,
             self.yscale_selector,
             pn.pane.Markdown("### Spectrum"),
             self.spectrum_selector,
+        ]
+
+        # Add catalog selector if multiple catalogs available
+        if self.catalog_selector is not None:
+            col2_widgets.extend([
+                pn.pane.Markdown("### Line Catalog"),
+                self.catalog_selector,
+            ])
+
+        col2_widgets.extend([
             pn.pane.Markdown("### Ion Filters"),
             self.ion_checkboxes,
+        ])
+
+        col2_controls = pn.Column(
+            *col2_widgets,
             width=180,  # 40% narrower (was 300)
         )
 
