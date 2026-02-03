@@ -105,6 +105,14 @@ dotfit/
 - Avoid network access or external resources in tests
 - Run full test suite before committing: `poetry run pytest`
 
+**CRITICAL - ALWAYS TEST EXAMPLES BEFORE DELIVERING**:
+- **ALWAYS run example scripts** (e.g., `examples/line_explorer_real_data.py`) before telling the user the code is ready
+- **DO NOT assume tests passing means examples work** - examples may have different runtime errors
+- **Test in the actual usage context** - if it's meant for Jupyter notebooks, test the actual rendering
+- **Find errors yourself** - it wastes the user's time if they have to report errors you could have caught
+- **Run**: `poetry run python examples/<example_file>.py` before every delivery
+- If example crashes, fix it and test again until it runs without errors
+
 ### Project Constraints
 
 - **Avoid over-engineering**: Keep solutions simple and focused

@@ -67,7 +67,7 @@ else:
 # %%
 # Launch app
 # app.panel()
-app.serve(port=5006, show=True)
+app.serve(port=5007, show=True)
 
 
 # %%
