@@ -1089,7 +1089,7 @@ class EmissionLines:
                 print("No entries could be regenerated from NIST")
             return None
 
-    def to_unite(self, groups, save=False):
+    def to_unite(self, groups, save=False, line_ratio_min=None):
         """
         Produces unite style jsons from the line catalogs of el.table
 
@@ -1097,6 +1097,9 @@ class EmissionLines:
             groups (list): List of dictionaries defining the groups.
                            e.g. [{'name': 'default'}, {'emission1': '[OII],[NII]'}, ...]
             save (bool): If True, dump to json file named "{name}.json"
+            line_ratio_min (float, optional): If provided, only include lines with
+                                             line_ratio > line_ratio_min in multiplets.
+                                             Default is None (include all lines).
 
         Returns:
             dict: The unite style dictionary
@@ -1264,6 +1267,11 @@ class EmissionLines:
                             val = row['line_ratio']
                             if not np.ma.is_masked(val) and not np.isnan(val):
                                 rel_strength = float(val)
+
+                        # Filter by line_ratio_min if specified
+                        if line_ratio_min is not None and rel_strength is not None:
+                            if rel_strength <= line_ratio_min:
+                                continue  # Skip weak lines
 
                         lines.append({'Wavelength': wave, 'RelStrength': rel_strength})
 

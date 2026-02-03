@@ -261,6 +261,11 @@ class LineExplorer:
                     catalog_name = Path(item).stem  # Use filename without extension
                     self.emission_catalogs[catalog_name] = table
                     logger.info(f"Loaded {len(table)} emission lines from {catalog_name}")
+
+                    # Debug: show first few ion values
+                    if 'ion' in table.colnames and len(table) > 0:
+                        sample_ions = [str(table['ion'][i]) for i in range(min(3, len(table)))]
+                        logger.info(f"  Sample ions from {catalog_name}: {sample_ions}")
                 else:
                     raise TypeError(f"List items must be Table or str, not {type(item)}")
             if len(self.emission_catalogs) == 0:
@@ -307,13 +312,32 @@ class LineExplorer:
 
     def _extract_unique_ions(self) -> None:
         """Extract unique ion names from the emission line table."""
+        if 'ion' not in self.emission_lines.colnames:
+            logger.warning("No 'ion' column found in emission lines table")
+            self.unique_ions = []
+            return
+
         ions = []
         for row in self.emission_lines:
-            ion = row.get('ion', '')
-            if ion and ion not in ions:
-                ions.append(ion)
+            # Get ion value and convert to native Python string
+            # Handle both dict-like access and direct attribute access
+            try:
+                if hasattr(row, 'get'):
+                    ion = row.get('ion', '')
+                else:
+                    ion = row['ion']
+
+                # Convert to native Python string to avoid numpy string issues
+                ion_str = str(ion).strip() if ion else ''
+
+                if ion_str and ion_str not in ions:
+                    ions.append(ion_str)
+            except (KeyError, IndexError, AttributeError) as e:
+                logger.warning(f"Error extracting ion from row: {e}")
+                continue
+
         self.unique_ions = sorted(ions)
-        logger.info(f"Found {len(self.unique_ions)} unique ions")
+        logger.info(f"Found {len(self.unique_ions)} unique ions: {self.unique_ions[:5]}...")
 
     def _get_element_color(self, ion: str) -> str:
         """Get color for an element/ion.

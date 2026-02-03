@@ -1,5 +1,5 @@
 key,ion,wave_vac,Ei,Ek,Aki,fik,gigk,configuration,terms,Ji-Jk,type,wave_air,classification,gf,multiplet,line_ratio,multiplet_term,references,note
-FeII-927,Fe II,928.8701547722119,0.048,0.0,0.0,0.0,,,a6D-u6D*,7/2-7/2,E1,927.174,permitted,0.0,10,989,a6D,Sigut+03,
+FeII-927,Fe II,928.8701547722119,0.048,0.0,0.0,0.0,'s','s',a6D-u6D*,7/2-7/2,E1,927.174,permitted,0.0,10,989,a6D,Sigut+03,' '
 FeII-1133,Fe II,1134.2860266022894,0.301,0.0,0.0,0.0,,,a4F-u4D*,7/2-5/2,E1,1133.674,permitted,0.0,6,5590,a4F,Sigut+03,
 FeII-1135,Fe II,1136.1884285507451,0.352,0.0,0.0,0.0,,,a4F-u4P*,5/2-3/2,E1,1135.578,permitted,0.0,6,518,a4F,Sigut+03,
 FeII-1138,Fe II,1139.5476782287394,0.352,0.0,0.0,0.0,,,a4F-u4D*,5/2-5/2,E1,1138.94,permitted,0.0,6,2430,a4F,Sigut+03,
