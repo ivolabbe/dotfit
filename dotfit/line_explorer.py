@@ -396,6 +396,18 @@ class LineExplorer:
                 ion_mask |= (self.emission_lines['ion'] == ion)
             mask &= ion_mask
 
+        # Filter by line_ratio slider (lines with missing ratio are exempt)
+        if hasattr(self, 'line_ratio_slider') and 'line_ratio' in self.emission_lines.colnames:
+            lr_min = self.line_ratio_slider.value
+            lr_vals = np.asarray(self.emission_lines['line_ratio'], dtype=float)
+            mask &= (~np.isfinite(lr_vals)) | (lr_vals >= lr_min)
+
+        # Filter by Ei cutoff slider (lines with missing Ei are exempt)
+        if hasattr(self, 'ei_cutoff_slider') and 'Ei' in self.emission_lines.colnames:
+            ei_max = self.ei_cutoff_slider.value
+            ei_vals = np.asarray(self.emission_lines['Ei'], dtype=float)
+            mask &= (~np.isfinite(ei_vals)) | (ei_vals <= ei_max)
+
         return self.emission_lines[mask]
 
     def _filter_lines_by_strength(
@@ -657,8 +669,8 @@ class LineExplorer:
 
         Scales all spectra in spectrum_dict IN-PLACE to match the reference spectrum.
         Reference: First PRISM in spectrum_dict if available, otherwise first spectrum.
-        All spectra are scaled to match the reference's median f_λ in 3-3.5 micron
-        observed wavelength range.
+        All spectra are scaled to match the reference's median f_λ in the
+        wavelength overlap region between each spectrum and the reference.
 
         This modifies spectrum_dict['flux'] and spectrum_dict['err'] directly.
         After this, all spectra are already scaled and no further scaling is needed.
@@ -686,73 +698,70 @@ class LineExplorer:
         if ref_key is None:
             ref_key = all_keys[0]
 
+        # Store reference key for later use
+        self.reference_spectrum_key = ref_key
+
         logger.info("=" * 60)
         if prism_found:
             logger.info(f"SCALING REFERENCE: '{ref_key}' (first PRISM)")
         else:
             logger.info(f"SCALING REFERENCE: '{ref_key}' (first spectrum, no PRISM found)")
 
-        # Compute reference median flux in 3-3.5 micron observed wavelength
-        z = self.redshift
+        # Scale each spectrum to match the reference using their overlap region
         ref_spec = self.spectrum_dict[ref_key]
-        ref_wave = ref_spec['wave']
+        ref_wave = ref_spec['wave']  # rest-frame Angstroms
         ref_flux = ref_spec['flux']
-        ref_wave_obs_micron = ref_wave * (1 + z) / 10000.0
-        ref_mask = (ref_wave_obs_micron >= 3.0) & (ref_wave_obs_micron <= 3.5)
 
-        if np.sum(ref_mask) > 0:
-            ref_median = np.nanmedian(ref_flux[ref_mask])
-        else:
-            logger.warning(f"Reference '{ref_key}' has no data in 3-3.5µm range, using full median")
-            ref_median = np.nanmedian(ref_flux)
-
-        logger.info(f"Reference median f_λ (3-3.5µm): {ref_median:.3e}")
-        logger.info("")
-
-        # Scale all spectra to match reference
+        # Scale all spectra to match reference in overlap region
         for spectrum_key in all_keys:
+            if spectrum_key == ref_key:
+                logger.info(f"  {spectrum_key}: REFERENCE (scale=1.000)")
+                continue
+
             spec = self.spectrum_dict[spectrum_key]
             wave = spec['wave']
             flux = spec['flux']
             err = spec.get('err', None)
 
-            # Convert to observed wavelength in microns
-            wave_obs_micron = wave * (1 + z) / 10000.0
-            mask = (wave_obs_micron >= 3.0) & (wave_obs_micron <= 3.5)
+            # Find overlap wavelength range
+            overlap_min = max(ref_wave.min(), wave.min())
+            overlap_max = min(ref_wave.max(), wave.max())
 
-            if np.sum(mask) > 0:
-                median_flux = np.nanmedian(flux[mask])
+            if overlap_min >= overlap_max:
+                logger.warning(f"  '{spectrum_key}': no wavelength overlap with reference, cannot scale")
+                continue
+
+            ref_mask = (ref_wave >= overlap_min) & (ref_wave <= overlap_max)
+            spec_mask = (wave >= overlap_min) & (wave <= overlap_max)
+
+            ref_median = np.nanmedian(ref_flux[ref_mask])
+            spec_median = np.nanmedian(flux[spec_mask])
+
+            logger.info(f"  {spectrum_key}: overlap {overlap_min:.0f}-{overlap_max:.0f} Å, "
+                        f"ref median={ref_median:.3e}, spec median={spec_median:.3e}")
+
+            if ref_median > 0 and spec_median > 0:
+                scale_factor = ref_median / spec_median
+                self.spectrum_dict[spectrum_key]['flux'] = flux * scale_factor
+                if err is not None:
+                    self.spectrum_dict[spectrum_key]['err'] = err * scale_factor
+                logger.info(f"  {spectrum_key}: SCALED by {scale_factor:.3f}")
             else:
-                logger.warning(f"  '{spectrum_key}' has no data in 3-3.5µm range, using full median")
-                median_flux = np.nanmedian(flux)
-
-            if spectrum_key == ref_key:
-                # Reference spectrum - no scaling
-                logger.info(f"  {spectrum_key}: REFERENCE (scale=1.000)")
-            else:
-                # Scale to match reference
-                if ref_median > 0 and median_flux > 0:
-                    scale_factor = ref_median / median_flux
-                    # Apply scaling IN-PLACE
-                    self.spectrum_dict[spectrum_key]['flux'] = flux * scale_factor
-                    if err is not None:
-                        self.spectrum_dict[spectrum_key]['err'] = err * scale_factor
-
-                    logger.info(f"  {spectrum_key}: SCALED by {scale_factor:.3f} (median was {median_flux:.3e})")
-                else:
-                    logger.warning(f"  {spectrum_key}: Cannot scale (invalid median)")
+                logger.warning(f"  {spectrum_key}: Cannot scale (invalid median)")
 
         # Verify scaling
         logger.info("")
-        logger.info("VERIFICATION (median f_λ in 3-3.5µm after scaling):")
+        logger.info("VERIFICATION (median f_λ in overlap after scaling):")
         for spectrum_key in all_keys:
+            if spectrum_key == ref_key:
+                continue
             spec = self.spectrum_dict[spectrum_key]
             wave = spec['wave']
-            flux = spec['flux']  # Already scaled
-            wave_obs_micron = wave * (1 + z) / 10000.0
-            mask = (wave_obs_micron >= 3.0) & (wave_obs_micron <= 3.5)
-
-            if np.sum(mask) > 0:
+            flux = spec['flux']
+            overlap_min = max(ref_wave.min(), wave.min())
+            overlap_max = min(ref_wave.max(), wave.max())
+            if overlap_min < overlap_max:
+                mask = (wave >= overlap_min) & (wave <= overlap_max)
                 median_scaled = np.nanmedian(flux[mask])
                 logger.info(f"  {spectrum_key}: {median_scaled:.3e}")
 
@@ -782,17 +791,6 @@ class LineExplorer:
             else:
                 return hv.Curve([])
 
-        # Compute reference median for display normalization
-        # Use median of first selected spectrum (all are already scaled to match)
-        reference_median = None
-        if selected and selected[0] in self.spectrum_dict:
-            ref_spec = self.spectrum_dict[selected[0]]
-            ref_flux = ref_spec['flux']  # Already scaled at initialization
-            reference_median = np.nanmedian(ref_flux)
-
-        if reference_median is None or reference_median <= 0:
-            reference_median = 1.0  # Fallback
-
         overlays = []
 
         for idx, spectrum_key in enumerate(selected):
@@ -801,17 +799,15 @@ class LineExplorer:
 
             spec = self.spectrum_dict[spectrum_key]
             wave = spec['wave']
-            flux = spec['flux']  # Already scaled at initialization
+            flux = spec['flux']  # Already scaled at initialization - use directly for display
 
             # Get error if available (also already scaled)
             err = spec.get('err', None)
 
-            # Normalize flux for display only (median = 0.5)
-            # All spectra use same reference median to preserve relative scaling
-            err_display = None
-            flux_display = flux / reference_median * 0.5
-            if err is not None:
-                err_display = err / reference_median * 0.5
+            # Use flux directly without additional normalization
+            # All spectra were already scaled to reference at initialization
+            flux_display = flux
+            err_display = err
 
             # Get color for this spectrum
             color = spectrum_colors[idx % len(spectrum_colors)]
@@ -849,23 +845,34 @@ class LineExplorer:
             # Calculate hover values for step data
             wave_obs_micron = wave_step * (1 + z) / 10000.0  # Observed wavelength in microns
 
-            # f_nu in µJy: f_nu = f_lambda * lambda^2 / c * 10^9
-            # Use flux_step which is already scaled
+            # Observed-frame wavelength in Å (for unit conversion)
+            wave_obs_angstrom = wave_step * (1 + z)
+
+            # f_nu in µJy: f_nu [erg/s/cm²/Hz] = f_lambda [erg/s/cm²/Å] × λ²[Å] / c[Å/s]
+            # 1 µJy = 1e-29 erg/s/cm²/Hz, so f_nu [µJy] = f_nu [cgs] × 1e29
             c_angstrom_per_s = 2.99792458e18
             with np.errstate(divide='ignore', invalid='ignore'):
-                flux_nu_ujy = flux_step * wave_step**2 / c_angstrom_per_s * 1e9
+                flux_nu_ujy = flux_step * wave_obs_angstrom**2 / c_angstrom_per_s * 1e29
 
-                # AB magnitude: AB = -2.5 * log10(f_nu / 3631) where f_nu is in µJy
-                # Use np.errstate to suppress warnings for invalid values
-                ab_mag = np.where(flux_nu_ujy > 0, -2.5 * np.log10(flux_nu_ujy / 3631.0), np.nan)
+                # AB magnitude: AB = -2.5 * log10(f_nu [µJy] / 3631e6)
+                # (3631 Jy = 3631e6 µJy is the AB zeropoint)
+                ab_mag = np.where(
+                    flux_nu_ujy > 0,
+                    -2.5 * np.log10(flux_nu_ujy / 3631e6),
+                    np.nan,
+                )
+
+            # Tooltip columns in human-readable units
+            flux_lambda_tooltip = flux_display_step * 1e20  # raw cgs → units of 10⁻²⁰
 
             # Create spectrum curve with explicit step data
+            # 'flux_raw' is the y-axis (raw cgs), tooltip vdims are scaled
             curve_data = {
                 'Wavelength [Å]': wave_step,
-                'Normalized Flux': flux_display_step,
+                'flux_raw': flux_display_step,
+                'f_λ (10⁻²⁰)': flux_lambda_tooltip,
                 'λ_obs (µm)': wave_obs_micron,
                 'λ_rest (Å)': wave_step,
-                'f_λ (10⁻²⁰)': flux_step,  # Already-scaled flux
                 'f_ν (µJy)': flux_nu_ujy,
                 'AB mag': ab_mag,
             }
@@ -873,7 +880,7 @@ class LineExplorer:
             curve = hv.Curve(
                 curve_data,
                 kdims='Wavelength [Å]',
-                vdims=['Normalized Flux', 'λ_obs (µm)', 'λ_rest (Å)', 'f_λ (10⁻²⁰)', 'f_ν (µJy)', 'AB mag']
+                vdims=['flux_raw', 'f_λ (10⁻²⁰)', 'λ_obs (µm)', 'λ_rest (Å)', 'f_ν (µJy)', 'AB mag']
             )
             curve = curve.relabel(spectrum_key)  # Set label for legend
             curve = curve.opts(
@@ -885,8 +892,8 @@ class LineExplorer:
                 hover_tooltips=[
                     ('λ_obs (µm)', '@{λ_obs (µm)}{0.000}'),
                     ('λ_rest (Å)', '@{λ_rest (Å)}{0.0}'),
-                    ('f_λ (10⁻²⁰)', '@{f_λ (10⁻²⁰)}{0.00}'),
-                    ('f_ν (µJy)', '@{f_ν (µJy)}{0.00}'),
+                    ('f_λ (10⁻²⁰)', '@{f_λ (10⁻²⁰)}{0.000}'),
+                    ('f_ν (µJy)', '@{f_ν (µJy)}{0.000}'),
                     ('AB mag', '@{AB mag}{0.00}'),
                 ],
             )
@@ -950,6 +957,10 @@ class LineExplorer:
         hv.Overlay
             Overlay of line markers with hover info
         """
+        # Check if lines should be shown
+        if not self.show_lines_toggle.value:
+            return hv.Overlay([])
+
         if x_range is None:
             # Use full spectrum range
             if self.current_spectrum and self.current_spectrum in self.spectrum_dict:
@@ -971,6 +982,21 @@ class LineExplorer:
 
         # Get set of selected line keys for faster lookup
         selected_keys = {line['key'] for line in self.selected_lines}
+
+        # Compute y midpoint from visible flux for hover point placement
+        selected = getattr(self, 'selected_spectra', [])
+        all_medians = []
+        for spec_key in selected:
+            if spec_key in self.spectrum_dict:
+                flux = self.spectrum_dict[spec_key]['flux']
+                wave = self.spectrum_dict[spec_key]['wave']
+                if self.x_range is not None:
+                    mask = (wave >= self.x_range[0]) & (wave <= self.x_range[1])
+                    flux = flux[mask]
+                valid = flux[np.isfinite(flux)]
+                if len(valid) > 0:
+                    all_medians.append(float(np.nanmedian(valid)))
+        y_mid = float(np.mean(all_medians)) if all_medians else 0.5
 
         # Create vertical line segments for each line
         overlays = []
@@ -1000,13 +1026,9 @@ class LineExplorer:
             )
             overlays.append(vline)
 
-            # Create invisible vertical segment for hover detection spanning full y-range
-            # This provides continuous hover trigger at this x-position regardless of y
+            # Collect line info for hover tooltip
             tooltip_dict = {
-                'x0': wave,
-                'y0': -0.5,  # Bottom of hover region
-                'x1': wave,
-                'y1': 2.0,   # Top of hover region (well above typical flux range)
+                'wave': wave,
                 'Line': key,
                 'Ion': ion,
                 'Wave': f"{wave:.2f}",
@@ -1038,15 +1060,27 @@ class LineExplorer:
 
             hover_data.append(tooltip_dict)
 
-        # Create invisible vertical segments for hover tooltips
-        # These span the full y-range at each line's x-position
-        # Using custom HoverTool with mode='vline' to trigger on x-coordinate only
+        # Create hover-detectable points at each line position
+        # Using Points with mode='vline' so hover triggers at the line's x regardless of y
         if hover_data:
             from bokeh.models import HoverTool
 
-            # Create custom hover tool with vline mode (triggers on x-position only)
+            points_dict = {
+                'x': [d['wave'] for d in hover_data],
+                'y': [y_mid for _ in hover_data],
+                'Line': [d['Line'] for d in hover_data],
+                'Ion': [d['Ion'] for d in hover_data],
+                'Wave': [d['Wave'] for d in hover_data],
+                'gf': [d['gf'] for d in hover_data],
+                'Aki': [d['Aki'] for d in hover_data],
+                'Ei': [d['Ei'] for d in hover_data],
+                'Ek': [d['Ek'] for d in hover_data],
+            }
+
             hover_tool = HoverTool(
                 mode='vline',
+                point_policy='snap_to_data',
+                attachment='vertical',
                 tooltips=[
                     ('Line', '@Line'),
                     ('Ion', '@Ion'),
@@ -1055,20 +1089,19 @@ class LineExplorer:
                     ('Aki', '@Aki'),
                     ('Ei (eV)', '@Ei'),
                     ('Ek (eV)', '@Ek'),
-                ]
+                ],
             )
 
-            hover_segments = hv.Segments(
-                hover_data,
-                kdims=['x0', 'y0', 'x1', 'y1'],
-                vdims=['Line', 'Ion', 'Wave', 'gf', 'Aki', 'Ei', 'Ek']
+            hover_points = hv.Points(
+                points_dict,
+                kdims=['x', 'y'],
+                vdims=['Line', 'Ion', 'Wave', 'gf', 'Aki', 'Ei', 'Ek'],
             ).opts(
-                line_width=1,  # Thin invisible line
-                alpha=0.0,  # Completely invisible
-                color='white',
-                tools=[hover_tool],  # Use custom hover tool with vline mode
+                size=1,
+                alpha=0.01,
+                tools=[hover_tool],
             )
-            overlays.append(hover_segments)
+            overlays.append(hover_points)
 
         return hv.Overlay(overlays)
 
@@ -1087,6 +1120,10 @@ class LineExplorer:
         hv.Labels
             Text labels for lines
         """
+        # Check if lines should be shown
+        if not self.show_lines_toggle.value:
+            return hv.Labels([])
+
         if x_range is None:
             # Use full spectrum range
             if self.current_spectrum and self.current_spectrum in self.spectrum_dict:
@@ -1123,24 +1160,8 @@ class LineExplorer:
         flux_in_range = None
 
         if spec is not None:
-            # Compute reference median for display normalization (same as in _create_spectrum_curve)
-            # Use first available spectrum as reference
-            selected = getattr(self, 'selected_spectra', [])
-            if not selected:
-                selected = [self.current_spectrum] if self.current_spectrum else []
-
-            reference_median = None
-            if selected and selected[0] in self.spectrum_dict:
-                ref_spec = self.spectrum_dict[selected[0]]
-                ref_flux = ref_spec['flux']  # Already scaled at initialization
-                reference_median = np.nanmedian(ref_flux)
-
-            if reference_median is None or reference_median <= 0:
-                reference_median = 1.0
-
-            # Apply same normalization as displayed spectrum
-            flux = spec['flux']  # Already scaled at initialization
-            flux_display = flux / reference_median * 0.5
+            # Use flux directly (already scaled at initialization, no further normalization)
+            flux_display = spec['flux']
             wave_spec = spec['wave']
 
             # Get flux values in the current x_range for determining y limits
@@ -1149,17 +1170,15 @@ class LineExplorer:
 
         # Position each label individually just above the spectrum at that wavelength
         label_data = []
-        label_offset = 0.15  # Fixed offset in normalized flux space
+        # Calculate label offset as percentage of flux value (10% above)
+        label_offset_pct = 0.10
 
         # Determine maximum label position based on visible data
-        # When zoomed in, labels should be at (window_max - offset) to stay visible
         if flux_in_range is not None and len(flux_in_range) > 0:
             flux_max_in_view = np.nanmax(flux_in_range)
-            # Window max is approximately where the highest flux is visible
-            # When zoomed in vertically, this is the effective window maximum
-            max_label_y = flux_max_in_view  # Don't exceed the max flux in view
+            max_label_y = flux_max_in_view
         else:
-            max_label_y = 1.0  # Default for normalized display
+            max_label_y = 1.0  # Fallback
 
         for idx in visible_idx:
             row = lines_in_range[idx]
@@ -1172,18 +1191,18 @@ class LineExplorer:
                 wave_idx = np.argmin(np.abs(wave_spec - wave))
                 if wave_idx < len(flux_display):
                     flux_at_line = flux_display[wave_idx]
-                    # Position label just above spectrum at this wavelength
-                    label_y = flux_at_line + label_offset
+                    # Position label above spectrum at this wavelength (10% higher)
+                    label_y = flux_at_line * (1.0 + label_offset_pct)
                 else:
                     # Fallback if wavelength not found
-                    label_y = 0.75
+                    label_y = max_label_y * 0.75
             else:
                 # Fallback if no spectrum data
-                label_y = 0.75
+                label_y = max_label_y * 0.75
 
-            # When zoomed in too much, clamp to (window_max - offset) to keep visible
+            # When zoomed in too much, clamp to max visible flux
             if label_y > max_label_y:
-                label_y = max_label_y - label_offset
+                label_y = max_label_y * 0.95
 
             label_data.append((wave, label_y, key))
 
@@ -1317,6 +1336,13 @@ class LineExplorer:
         self.selected_spectra = initial_selection
         self.spectrum_selector.param.watch(self._on_spectrum_change, 'value')
 
+        # Show lines toggle (above catalog selector)
+        self.show_lines_toggle = pn.widgets.Checkbox(
+            name='Show Emission Lines',
+            value=True,  # Lines shown by default
+        )
+        self.show_lines_toggle.param.watch(self._on_show_lines_toggle, 'value')
+
         # Catalog selector (only shown if multiple catalogs)
         if len(self.emission_catalogs) > 1:
             catalog_options = list(self.emission_catalogs.keys())
@@ -1329,6 +1355,57 @@ class LineExplorer:
             self.catalog_selector.param.watch(self._on_catalog_change, 'value')
         else:
             self.catalog_selector = None
+
+        # Line filter sliders
+        # Compute median line_ratio and Ei across all loaded catalogs
+        all_lr, all_ei = [], []
+        for cat in self.emission_catalogs.values():
+            if 'line_ratio' in cat.colnames:
+                lr = np.asarray(cat['line_ratio'], dtype=float)
+                lr = lr[np.isfinite(lr)]
+                all_lr.append(lr)
+            if 'Ei' in cat.colnames:
+                ei = np.asarray(cat['Ei'], dtype=float)
+                ei = ei[np.isfinite(ei)]
+                all_ei.append(ei)
+
+        # line_ratio not used for initial value — always start at 0.5
+        _ = all_lr  # computed above but not needed for default
+
+        if all_ei:
+            combined_ei = np.concatenate(all_ei)
+            ei_max = float(np.ceil(np.max(combined_ei)))
+            ei_median = float(np.round(np.median(combined_ei), 1))
+        else:
+            ei_max, ei_median = 20.0, 5.0
+
+        self.line_ratio_slider = pn.widgets.FloatSlider(
+            name='Line ratio min',
+            start=0.0,
+            end=1.0,
+            step=0.01,
+            value=0.5,
+            width=160,
+        )
+        self.line_ratio_slider.param.watch(self._on_filter_slider_change, 'value_throttled')
+
+        self.ei_cutoff_slider = pn.widgets.FloatSlider(
+            name='Ei (eV) max',
+            start=0.0,
+            end=ei_max,
+            step=0.1,
+            value=ei_median,
+            width=160,
+        )
+        self.ei_cutoff_slider.param.watch(self._on_filter_slider_change, 'value_throttled')
+
+        # Invert ion selection button
+        self.invert_ion_selection_button = pn.widgets.Button(
+            name='Invert Ion Selection',
+            button_type='default',
+            width=180,
+        )
+        self.invert_ion_selection_button.on_click(self._on_invert_ion_selection)
 
         # Selected lines counter
         self.selected_counter = pn.widgets.Button(
@@ -1430,34 +1507,14 @@ class LineExplorer:
         # Get y-axis scale
         yscale = self.yscale_selector.value if hasattr(self, 'yscale_selector') else 'linear'
 
-        # For symlog, compute linthresh (linear to log transition)
-        # Use max(5x median error, median flux)
-        linthresh = None
-        if yscale == 'symlog' and self.current_spectrum and self.current_spectrum in self.spectrum_dict:
-            spec = self.spectrum_dict[self.current_spectrum]
-            flux = spec['flux']
-            err = spec.get('err', None)
-
-            median_flux = np.nanmedian(np.abs(flux))
-
-            if err is not None:
-                median_err = np.nanmedian(err)
-                linthresh = max(5 * median_err, median_flux)
-            else:
-                linthresh = median_flux
-
-            # Normalize linthresh to match displayed flux (normalized to median=0.5)
-            if median_flux > 0:
-                linthresh = linthresh / median_flux * 0.5
-
         # Combine into overlay
         opts = dict(
-            width=920,  # 15% wider (800 * 1.15)
-            height=550,  # 10% taller (500 * 1.10)
+            responsive=True,
+            min_height=400,
             xlabel='Rest-frame Wavelength [Å]',
-            ylabel='Normalized Flux',
+            ylabel='f_λ [10⁻²⁰ erg s⁻¹ cm⁻² Å⁻¹]',
             show_grid=True,
-            tools=['pan', 'wheel_zoom', 'box_zoom', 'reset', 'hover', 'tap'],
+            tools=['pan', 'wheel_zoom', 'box_zoom', 'reset', 'tap'],
             active_tools=['pan', 'wheel_zoom'],
             fontscale=1.3,  # Scale all fonts by 30%
         )
@@ -1465,123 +1522,189 @@ class LineExplorer:
         # Apply y-axis scaling
         hooks = []
 
+        # Pre-compute flux stats from visible spectra within the current window
+        selected = getattr(self, 'selected_spectra', [])
+        all_flux = []
+        all_err = []
+        for spec_key in selected:
+            if spec_key in self.spectrum_dict:
+                spec = self.spectrum_dict[spec_key]
+                wave = spec['wave']
+                flux = spec['flux']
+                err = spec.get('err', None)
+                # Filter to visible x-range window
+                if self.x_range is not None:
+                    mask = (wave >= self.x_range[0]) & (wave <= self.x_range[1])
+                    all_flux.append(flux[mask])
+                    if err is not None:
+                        all_err.append(err[mask])
+                else:
+                    all_flux.append(flux)
+                    if err is not None:
+                        all_err.append(err)
+        if all_flux:
+            combined = np.concatenate(all_flux)
+            valid = combined[np.isfinite(combined)]
+        else:
+            valid = np.array([])
+        if all_err:
+            combined_err = np.concatenate(all_err)
+            valid_err = combined_err[np.isfinite(combined_err)]
+        else:
+            valid_err = np.array([])
+
+        if len(valid) > 0:
+            flux_min = float(np.nanmin(valid))
+            flux_median = float(np.nanmedian(valid))
+            flux_max = float(np.nanmax(valid))
+            # Smallest positive value for log scales
+            pos = valid[valid > 0]
+            flux_pos_min = float(np.nanmin(pos)) if len(pos) > 0 else 1e-4
+        else:
+            flux_min, flux_median, flux_max, flux_pos_min = 0.0, 0.5, 1.0, 1e-4
+
+        if len(valid_err) > 0:
+            err_median = float(np.nanmedian(valid_err))
+        else:
+            err_median = 0.0
+
         if yscale == 'log':
             opts['logy'] = True
+
+            # Sensible log range: smallest positive value / 10 to 2*median
+            y_log_min = flux_pos_min / 10.0
+            y_log_max = max(2.0 * flux_median, flux_pos_min * 10.0)
+
+            def apply_log(plot, element):
+                """Set sensible y-range for log scale on initialization."""
+                from bokeh.models import LogScale, Range1d
+
+                fig = plot.state
+                is_initializing = not isinstance(fig.y_scale, LogScale)
+                if is_initializing:
+                    fig.y_range = Range1d(start=y_log_min, end=y_log_max)
+
+            hooks.append(apply_log)
+
         elif yscale == 'symlog':
-            # Implement true symlog with linthresh = median flux
-            # For |y| < linthresh: linear scaling
-            # For |y| >= linthresh: log scaling
-            # This allows showing values near 0 linearly, then transitioning to log
+            # linthresh = median flux (transition point from linear to log)
+            linthresh = flux_median if flux_median > 0 else 0.1
 
-            # Get median flux for linthresh
-            if self.current_spectrum and self.current_spectrum in self.spectrum_dict:
-                spec = self.spectrum_dict[self.current_spectrum]
-                flux = spec['flux']
-                median_flux = np.nanmedian(flux)
-
-                # After normalization (median -> 0.5), linthresh should be 0.5
-                # But we're in normalized space, so use the normalized value
-                linthresh_normalized = 0.5  # Median flux after normalization
-            else:
-                linthresh_normalized = 0.1  # Default fallback
-
-            # Don't force ylim here - let the hook handle it only on initialization
+            # Sensible symlog range
+            y_symlog_min = flux_pos_min / 10.0
+            y_symlog_max = max(2.0 * flux_median, flux_pos_min * 10.0)
 
             def apply_symlog(plot, element):
-                """Apply symlog-like scaling with linear region near 0.
-
-                Only forces y_min=0 on initialization (when transitioning from non-log scale).
-                On subsequent redraws (zoom, pan, filter), preserves the current y_range.
-                """
+                """Apply log scaling with sensible range derived from data."""
                 from bokeh.models import LogScale, Range1d
                 from bokeh.models.tickers import FixedTicker
-                from bokeh.models.formatters import PrintfTickFormatter
                 import numpy as np
 
                 fig = plot.state
-
-                # Check if we're transitioning TO symlog (not already in log scale)
-                # If y_scale is already LogScale, we're on a redraw, not initialization
                 is_initializing = not isinstance(fig.y_scale, LogScale)
-
-                # Use log scale for y-axis
                 fig.y_scale = LogScale()
 
-                # Only force y-range to start at 0 on initialization
-                # On redraws (zoom, pan, filter changes), preserve current range
                 if is_initializing:
-                    # Set y-range to start at linthresh/100 (small value to show near-zero data)
-                    linthresh = linthresh_normalized
-                    y_min = max(linthresh / 100, 1e-4)  # Start well below threshold
+                    fig.y_range = Range1d(start=y_symlog_min, end=y_symlog_max)
 
-                    # Get data range
-                    current_end = fig.y_range.end if hasattr(fig.y_range, 'end') else None
-                    y_max = current_end if current_end is not None and current_end > y_min else 10.0
+                # Custom ticks spanning the data range
+                current_y_max = fig.y_range.end if hasattr(fig.y_range, 'end') else y_symlog_max
+                current_y_min = fig.y_range.start if hasattr(fig.y_range, 'start') else y_symlog_min
 
-                    # Set range to start at effectively 0 (small value in log space)
-                    fig.y_range = Range1d(start=y_min, end=y_max)
+                min_exp = int(np.floor(np.log10(max(current_y_min, 1e-30))))
+                max_exp = int(np.ceil(np.log10(max(current_y_max, 1e-30))))
 
-                # Always update custom ticks to include the linear threshold
-                # Get current y_max for tick generation
-                current_y_max = fig.y_range.end if hasattr(fig.y_range, 'end') else 10.0
-                linthresh = linthresh_normalized
-
-                # Create custom ticks that include the linear threshold
-                tick_values = []
-
-                # Log ticks below linthresh
-                for exp in range(-4, int(np.floor(np.log10(linthresh)))):
-                    tick_values.append(10**exp)
-
-                # Add linthresh
-                tick_values.append(linthresh)
-
-                # Log ticks above linthresh
-                for exp in range(int(np.ceil(np.log10(linthresh))), int(np.log10(current_y_max)) + 2):
-                    tick_values.append(10**exp)
+                tick_values = [10**e for e in range(min_exp, max_exp + 1)]
+                if linthresh not in tick_values:
+                    tick_values.append(linthresh)
+                    tick_values.sort()
 
                 fig.yaxis.ticker = FixedTicker(ticks=tick_values)
 
             hooks.append(apply_symlog)
-            # Don't set logy=True here, we handle it in the hook
+
         else:
-            # Linear scale - explicitly reset to LinearScale to override any previous log/symlog
+            # Linear scale
             opts['logy'] = False
 
-            # Capture auto_scaling_mode for use in hook closure
-            auto_scaling_mode = self._auto_scaling_mode
+            y_lin_min = -2.0 * err_median if err_median > 0 else flux_min
+            y_lin_max = 2.0 * flux_median if flux_median > 0 else flux_max
 
             def apply_linear(plot, element):
-                """Explicitly apply linear scaling and reset y-axis.
-
-                On initialization (switching from log/symlog or in auto-scaling mode),
-                sets y_range to (0, 2*median). Since spectra are normalized
-                to median=0.5, this means (0, 1.0).
-                When user has zoomed/panned (not in auto-scaling mode), preserves current range.
-                """
+                """Apply linear scaling with sensible y-range from data."""
                 from bokeh.models import LinearScale, BasicTicker, Range1d, LogScale
                 from bokeh.models.formatters import BasicTickFormatter
 
                 fig = plot.state
-
-                # Check if we're transitioning from log/symlog scale
                 transitioning_from_log = isinstance(fig.y_scale, LogScale)
 
-                # Force linear scale
                 fig.y_scale = LinearScale()
-
-                # Reset ticker to default
                 fig.yaxis.ticker = BasicTicker()
                 fig.yaxis.formatter = BasicTickFormatter()
 
-                # Set y_range to (0, 1.0) if:
-                # 1. Transitioning from log/symlog (scale switch)
-                # 2. In auto-scaling mode (first render or user hasn't zoomed)
-                if transitioning_from_log or auto_scaling_mode:
-                    fig.y_range = Range1d(start=0, end=1.0)
-                # Otherwise preserve current range (user has zoomed/panned)
+                # Always reset y-range when switching from log/symlog,
+                # or on first render / auto-scaling
+                if transitioning_from_log or self._auto_scaling_mode:
+                    fig.y_range = Range1d(start=y_lin_min, end=y_lin_max)
 
             hooks.append(apply_linear)
+
+        # Add hook to enable Shift + drag for box zoom
+        def configure_box_zoom(plot, element):
+            """Configure BoxZoomTool to activate with Shift held.
+
+            Attaches document-level keydown/keyup listeners (once) that
+            toggle between pan and box-zoom based on the Shift key.
+            """
+            from bokeh.models import CustomJS
+
+            fig = plot.state
+
+            pan_tool = None
+            box_zoom_tool = None
+            for tool in fig.toolbar.tools:
+                if tool.__class__.__name__ == 'PanTool':
+                    pan_tool = tool
+                elif tool.__class__.__name__ == 'BoxZoomTool':
+                    box_zoom_tool = tool
+
+            if not pan_tool or not box_zoom_tool:
+                return
+
+            # Guard ensures listeners are added only once per document,
+            # and references are updated on each redraw so they always
+            # point to the current figure's tools.
+            js = CustomJS(args=dict(pan=pan_tool, zoom=box_zoom_tool), code="""
+                // Store current tool refs on window so listeners use latest
+                window._le_pan = pan;
+                window._le_zoom = zoom;
+
+                if (window._le_shift_listeners) return;  // already attached
+                window._le_shift_listeners = true;
+
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === 'Shift' && window._le_pan && window._le_zoom) {
+                        try {
+                            window._le_pan.active = false;
+                            window._le_zoom.active = true;
+                        } catch(err) {}
+                    }
+                });
+                document.addEventListener('keyup', (e) => {
+                    if (e.key === 'Shift' && window._le_pan && window._le_zoom) {
+                        try {
+                            window._le_zoom.active = false;
+                            window._le_pan.active = true;
+                        } catch(err) {}
+                    }
+                });
+            """)
+            # rangesupdate is a PlotEvent — fires on initial render and
+            # on every DynamicMap redraw when the new figure computes ranges.
+            # (document_ready is a DocumentEvent and does NOT fire on figures.)
+            fig.js_on_event('rangesupdate', js)
+
+        hooks.append(configure_box_zoom)
 
         # Add hook to create secondary x-axis for observed wavelength
         def add_observed_axis(plot, element):
@@ -1911,6 +2034,10 @@ class LineExplorer:
         ion : str
             Ion name being toggled
         """
+        # Skip if suppressed (e.g., during invert selection batch update)
+        if getattr(self, '_suppress_ion_callbacks', False):
+            return
+
         if self.debug:
             print(f"☑️  Ion toggle: {ion} = {event.new}")
 
@@ -1920,6 +2047,36 @@ class LineExplorer:
             self.visible_ions.discard(ion)
 
         # Update plot
+        self._update_plot_simple()
+
+    def _on_invert_ion_selection(self, event) -> None:
+        """Callback for invert ion selection button.
+
+        Inverts the state of all ion checkboxes.
+        Efficiently updates all checkboxes at once without triggering individual callbacks.
+        """
+        if self.debug:
+            print("🔄 Inverting ion selection")
+
+        # Get all unique ions
+        all_ions = set(self.unique_ions)
+
+        # Invert: visible becomes invisible, invisible becomes visible
+        new_visible_ions = all_ions - self.visible_ions
+
+        # Update visible_ions first
+        self.visible_ions = new_visible_ions
+
+        # Suppress individual checkbox callbacks during batch update
+        self._suppress_ion_callbacks = True
+        try:
+            for ion, checkbox in self.ion_checkbox_widgets.items():
+                checkbox.value = ion in self.visible_ions
+        finally:
+            self._suppress_ion_callbacks = False
+
+        # Update plot ONCE after all checkboxes are updated
+        logger.info(f"Inverted ion selection: {len(self.visible_ions)} ions now visible")
         self._update_plot_simple()
 
     def _on_spectrum_change(self, event) -> None:
@@ -2023,6 +2180,9 @@ class LineExplorer:
         if 'H I' in self.unique_ions:
             self.visible_ions.add('H I')
 
+        # Update filter sliders to new catalog's medians
+        self._update_filter_sliders()
+
         # Update ion checkboxes (different catalog may have different ions)
         # Must reset the creation flag to allow recreation
         self._checkboxes_created = False
@@ -2030,6 +2190,22 @@ class LineExplorer:
 
         # Trigger plot update
         logger.info(f"Triggering plot update for catalog '{new_catalog}'")
+        self._update_plot_simple()
+
+    def _on_show_lines_toggle(self, event) -> None:
+        """Callback for show lines toggle.
+
+        Parameters
+        ----------
+        event : param.Event
+            Parameter change event
+        """
+        show_lines = event.new
+        if self.debug:
+            print(f"👁️ Show lines toggle: {show_lines}")
+
+        logger.info(f"Show lines: {show_lines}")
+        # Trigger plot update
         self._update_plot_simple()
 
     def _on_yscale_change(self, event) -> None:
@@ -2046,6 +2222,31 @@ class LineExplorer:
         logger.info(f"Y-scale change: {event.new}")
 
         # Trigger plot update
+        self._update_plot_simple()
+
+    def _update_filter_sliders(self) -> None:
+        """Update filter slider values to match current catalog medians."""
+        cat = self.emission_lines
+
+        if 'line_ratio' in cat.colnames:
+            lr = np.asarray(cat['line_ratio'], dtype=float)
+            lr_valid = lr[np.isfinite(lr)]
+            if len(lr_valid) > 0:
+                self.line_ratio_slider.value = 0.5
+
+        if 'Ei' in cat.colnames:
+            ei = np.asarray(cat['Ei'], dtype=float)
+            ei_valid = ei[np.isfinite(ei)]
+            if len(ei_valid) > 0:
+                new_max = float(np.ceil(np.max(ei_valid)))
+                new_med = float(np.round(np.median(ei_valid), 1))
+                self.ei_cutoff_slider.end = new_max
+                self.ei_cutoff_slider.value = new_med
+
+    def _on_filter_slider_change(self, event) -> None:
+        """Callback for gf or Ei cutoff slider change."""
+        if self.debug:
+            print(f"🔧 Filter slider change: {event.obj.name} = {event.new}")
         self._update_plot_simple()
 
     def _on_counter_click(self, event) -> None:
@@ -2349,6 +2550,9 @@ class LineExplorer:
             self.spectrum_selector,
         ]
 
+        # Add show lines toggle
+        col2_widgets.append(self.show_lines_toggle)
+
         # Add catalog selector if multiple catalogs available
         if self.catalog_selector is not None:
             col2_widgets.extend([
@@ -2357,7 +2561,11 @@ class LineExplorer:
             ])
 
         col2_widgets.extend([
+            pn.pane.Markdown("### Line Filters"),
+            self.line_ratio_slider,
+            self.ei_cutoff_slider,
             pn.pane.Markdown("### Ion Filters"),
+            self.invert_ion_selection_button,
             self.ion_checkboxes,
         ])
 

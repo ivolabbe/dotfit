@@ -85,16 +85,29 @@ def _parse_gigk(gigk_str):
 
 
 def _should_use_pyneb(ion, group):
+    """Check if PyNeb should be used for this multiplet.
+
+    PyNeb is only used when:
+    - Ion is H I, He I, or He II (recombination lines)
+    - Multiple lines AND all are forbidden/semi-forbidden
+
+    For mixed multiplets (permitted + forbidden), Boltzmann is used
+    since PyNeb doesn't have most permitted lines and they share a
+    common lower level anyway.
+    """
     if ion in {'H I', 'He I', 'He II'}:
         return True
     if 'classification' not in group.colnames:
-        return True
+        # No classification info - try Boltzmann first
+        return False
     classes = []
     for c in group['classification']:
         if isinstance(c, np.ma.core.MaskedConstant):
             continue
         classes.append(str(c).strip().lower())
-    return any(c in {'forbidden', 'semi-forbidden'} for c in classes)
+    # Only use PyNeb if ALL lines are forbidden/semi-forbidden
+    # (avoid trying PyNeb for permitted lines in mixed multiplets)
+    return all(c in {'forbidden', 'semi-forbidden'} for c in classes)
 
 
 def _compute_boltzmann_ratios(wave_vac, Ek, gu, f, Te):
@@ -2339,11 +2352,13 @@ def emissivity_ratios(atom, level, wave_vac, Te=1e4, Ne=1e2, relative=False, tol
             try:
                 emissivity[i] = neb_atom.getEmissivity(Te, Ne, wave=w_neb)
             except Exception as e:
-                print(f"Failed emissivity for {atom} {level} at {w_neb:.2f} Å: {e}")
+                if verbose:
+                    print(f"Failed emissivity for {atom} {level} at {w_neb:.2f} Å: {e}")
         else:
-            print(
-                f"No PyNeb line for {atom} {level} within {tolerance:.2f} Å of {w:.2f} Å (closest {line_waves[idx]:.2f} Å, dw={dw:.2f} Å )"
-            )
+            if verbose:
+                print(
+                    f"No PyNeb line for {atom} {level} within {tolerance:.2f} Å of {w:.2f} Å (closest {line_waves[idx]:.2f} Å, dw={dw:.2f} Å )"
+                )
 
     # Normalize
     if relative:
