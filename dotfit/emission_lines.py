@@ -40,6 +40,63 @@ def _filter_multiplet_kwargs(kwargs):
     return filtered
 
 
+import operator as _op
+
+_OPS = {
+    '>=': _op.ge,
+    '<=': _op.le,
+    '!=': _op.ne,
+    '>': _op.gt,
+    '<': _op.lt,
+    '==': _op.eq,
+}
+
+
+def filter_table(table, expr):
+    """Filter an astropy Table using simple comparison expressions.
+
+    Parses a string of comma-separated conditions and returns rows
+    where all conditions are satisfied (AND logic).
+
+    Args:
+        table: Astropy Table to filter.
+        expr: One or more comma-separated ``'column operator value'``
+            expressions. Spaces around operators are optional.
+
+            Supported operators: ``>``, ``<``, ``>=``, ``<=``, ``==``, ``!=``.
+
+            Examples::
+
+                filter_table(tab, 'line_ratio>0.1')
+                filter_table(tab, 'Aki<1e-3, Ei<=4.0')
+                filter_table(tab, 'gf>=0.01, wave_vac>3000, wave_vac<7000')
+
+    Returns:
+        Filtered copy of the input Table.
+
+    Raises:
+        ValueError: If an expression cannot be parsed.
+        KeyError: If a column name does not exist in the table.
+    """
+    mask = np.ones(len(table), dtype=bool)
+    for clause in expr.split(','):
+        clause = clause.strip()
+        if not clause:
+            continue
+        # Match longest operator first (>=, <= before >, <)
+        matched = False
+        for op_str, op_func in _OPS.items():
+            if op_str in clause:
+                col, val = clause.split(op_str, 1)
+                col, val = col.strip(), val.strip()
+                mask &= op_func(np.asarray(table[col], dtype=float), float(val))
+                matched = True
+                break
+        if not matched:
+            raise ValueError(f"Cannot parse filter expression: '{clause}'")
+    return table[mask]
+
+
 def _ensure_multiplet_ratios(tab, kwargs):
     has_Te = 'Te' in kwargs
     has_ne = 'ne' in kwargs or 'Ne' in kwargs
@@ -773,7 +830,29 @@ class EmissionLines:
             self.table.remove_rows(ix_remove)
             self.lines = {l['key']: dict(l) for l in self.table}
 
-    def get_table(self, search_key=None, wave=None, multiplet=False, **kwargs):
+    def get_table(self, search_key=None, wave=None, filter=None, multiplet=False, **kwargs):
+        """Return a subset of the emission line table.
+
+        Args:
+            search_key: Ion name (``'Fe II'``), line key (``'Ha'``),
+                or group alias (``'[OIII]'``).  ``None`` returns all lines.
+            wave: Two-element list ``[lo, hi]`` restricting vacuum
+                wavelength range in Angstroms.
+            filter: Column filter expression passed to :func:`filter_table`.
+                Comma-separated conditions, e.g. ``'line_ratio>1e-2,Ei<4'``.
+            multiplet: If ``True``, ensure multiplet ratios are computed.
+            **kwargs: Forwarded to multiplet ratio calculation
+                (``Te``, ``Ne``, etc.).
+
+        Returns:
+            Filtered astropy Table.
+
+        Examples::
+
+            el.get_table('Fe II', wave=[3700, 7100])
+            el.get_table(wave=[3700, 7100], filter='line_ratio>1e-2')
+            el.get_table('[OIII]', filter='Aki>1e3')
+        """
         if wave is not None:
             iw = (self.table['wave_vac'] >= wave[0]) & (self.table['wave_vac'] <= wave[1])
         else:
@@ -798,6 +877,9 @@ class EmissionLines:
             tab = self.table[ik & iw]
         else:
             tab = self.table[(self.table['key'] == search_key) & iw]
+
+        if filter is not None:
+            tab = filter_table(tab, filter)
 
         if multiplet:
             # Only recalculate if multiplet/line_ratio columns are missing or trivial
@@ -2243,15 +2325,8 @@ def get_line_nist(
         print(f"No matching lines found for {ion} in the specified range.")
         return None
 
-    # support threshold strings like 'Ei<2.0' or 'Aki>1e3'
     if isinstance(threshold, str):
-        if '>' in threshold:
-            col, val = threshold.split('>')
-            ix = output[col] > float(val)
-        elif '<' in threshold:
-            col, val = threshold.split('<')
-            ix = output[col] < float(val)
-        output = output[ix]
+        output = filter_table(output, threshold)
 
     if len(output) == 0:
         print(f"No matching lines found for {ion} in the specified range.")
