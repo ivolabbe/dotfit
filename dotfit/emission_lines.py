@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import re
 import warnings
 from pathlib import Path
@@ -42,14 +44,7 @@ def _filter_multiplet_kwargs(kwargs):
 
 import operator as _op
 
-_OPS = {
-    '>=': _op.ge,
-    '<=': _op.le,
-    '!=': _op.ne,
-    '>': _op.gt,
-    '<': _op.lt,
-    '==': _op.eq,
-}
+_OPS = {'>=': _op.ge, '<=': _op.le, '!=': _op.ne, '>': _op.gt, '<': _op.lt, '==': _op.eq}
 
 
 def filter_table(table, expr):
@@ -1387,6 +1382,28 @@ class EmissionLines:
                 json.dump(unite_dict, f, indent=4)
 
         return unite_dict
+
+    @staticmethod
+    def to_lines(linetype: str, ion: str, wavelengths: list[float]) -> dict:
+        """Build a unite-style line dict from explicit wavelengths.
+
+        Negative wavelengths are treated as multiplet lines (appends ``*``).
+
+        Args:
+            linetype: Line type key (e.g. ``'emission'``).
+            ion: Ion label (e.g. ``'FeII'``).
+            wavelengths: Wavelengths in Angstrom. Use negative values to
+                flag multiplet lines.
+
+        Returns:
+            Dict of ``{linetype: 'ion-w1,ion-w2*,...'}`` ready for
+            :meth:`to_unite` group lists.
+        """
+        parts = []
+        for w in wavelengths:
+            suffix = '*' if w < 0 else ''
+            parts.append(f"{ion}-{abs(w)}{suffix}")
+        return {linetype: ','.join(parts)}
 
 
 def read_kurucz_table(

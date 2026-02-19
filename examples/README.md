@@ -23,7 +23,12 @@ This directory contains examples demonstrating how to use the `LineExplorer` int
 Command line usage:
 ```bash
 poetry run python examples/line_explorer_real_data.py
+
+git clone https://github.com/ivolabbe/dotfit.git ; cd dotfit
+poetry install ; cd examples
+poetry run python line_explorer_monster.py --emission-lines-csv '../dotfit/data/emission_lines/*csv' --selected-lines-csv monster_v2.csv  --redshift 4.464 --port 8080     
 ```
+
 
 This will:
 1. Download real NIRSpec spectra for abell2744-8204-45924 (z=4.465)

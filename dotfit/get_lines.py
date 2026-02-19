@@ -1,3 +1,8 @@
+# https://lweb.cfa.harvard.edu/amp/ampdata/kurucz23/sekur.html
+
+# run with
+# poetry run python line_explorer_monster.py --emission-lines-csv '../dotfit/data/emission_lines/*csv' --selected-lines-csv monster_v2.csv  --redshift 4.464 --port 8080
+
 # %%
 from dataclasses import dataclass
 from pathlib import Path
@@ -63,6 +68,9 @@ datadir = Path(dotfit.__file__).parent / 'data/emission_lines/'
 
 el = EmissionLines()
 
+r = get_line_nist('Fe II', wave=[7150, 7160], verbose=True, classification='forbidden')
+r
+# %%
 # from astropy.units import Quantity
 # Quantity(spec['wave'])
 # tab = el.table[el.table['Ei'] < 6]
@@ -120,7 +128,7 @@ plt.hist(np.log10(opt['line_ratio']), bins=50, range=(-10, 1))
 opt = el.get_table(wave=[3700, 7100], filter='line_ratio>1e-2')
 plt.hist(np.log10(opt['line_ratio']), bins=50, range=(-10, 1))
 
-opt.write(datadir / 'fe_optical.csv', overwrite=True)
+opt.write(datadir / 'feti_opt_kurucz.csv', overwrite=True)
 
 # plt.hist(np.log10(opt['gf']), bins=50)
 

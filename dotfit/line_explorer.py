@@ -1058,6 +1058,20 @@ class LineExplorer:
             else:
                 tooltip_dict['Ek'] = 'N/A'
 
+            # Parse lower/upper level terms from 'terms' column (e.g. "a6D-u6D*")
+            if 'terms' in row.colnames and row['terms'] and str(row['terms']).strip():
+                terms_str = str(row['terms']).strip()
+                if '-' in terms_str:
+                    parts = terms_str.split('-', 1)
+                    tooltip_dict['Lower'] = parts[0]
+                    tooltip_dict['Upper'] = parts[1]
+                else:
+                    tooltip_dict['Lower'] = terms_str
+                    tooltip_dict['Upper'] = 'N/A'
+            else:
+                tooltip_dict['Lower'] = 'N/A'
+                tooltip_dict['Upper'] = 'N/A'
+
             hover_data.append(tooltip_dict)
 
         # Create hover-detectable points at each line position
@@ -1075,6 +1089,8 @@ class LineExplorer:
                 'Aki': [d['Aki'] for d in hover_data],
                 'Ei': [d['Ei'] for d in hover_data],
                 'Ek': [d['Ek'] for d in hover_data],
+                'Lower': [d['Lower'] for d in hover_data],
+                'Upper': [d['Upper'] for d in hover_data],
             }
 
             hover_tool = HoverTool(
@@ -1085,6 +1101,8 @@ class LineExplorer:
                     ('Line', '@Line'),
                     ('Ion', '@Ion'),
                     ('λ (Å)', '@Wave'),
+                    ('Lower', '@Lower'),
+                    ('Upper', '@Upper'),
                     ('gf', '@gf'),
                     ('Aki', '@Aki'),
                     ('Ei (eV)', '@Ei'),
@@ -1095,7 +1113,7 @@ class LineExplorer:
             hover_points = hv.Points(
                 points_dict,
                 kdims=['x', 'y'],
-                vdims=['Line', 'Ion', 'Wave', 'gf', 'Aki', 'Ei', 'Ek'],
+                vdims=['Line', 'Ion', 'Wave', 'gf', 'Aki', 'Ei', 'Ek', 'Lower', 'Upper'],
             ).opts(
                 size=1,
                 alpha=0.01,
@@ -2225,23 +2243,22 @@ class LineExplorer:
         self._update_plot_simple()
 
     def _update_filter_sliders(self) -> None:
-        """Update filter slider values to match current catalog medians."""
-        cat = self.emission_lines
+        """Update filter slider ranges for the current catalog.
 
-        if 'line_ratio' in cat.colnames:
-            lr = np.asarray(cat['line_ratio'], dtype=float)
-            lr_valid = lr[np.isfinite(lr)]
-            if len(lr_valid) > 0:
-                self.line_ratio_slider.value = 0.5
+        Only adjusts the slider *range* (end) to fit the new catalog.
+        Slider *values* are preserved so filters persist across catalog switches.
+        """
+        cat = self.emission_lines
 
         if 'Ei' in cat.colnames:
             ei = np.asarray(cat['Ei'], dtype=float)
             ei_valid = ei[np.isfinite(ei)]
             if len(ei_valid) > 0:
                 new_max = float(np.ceil(np.max(ei_valid)))
-                new_med = float(np.round(np.median(ei_valid), 1))
                 self.ei_cutoff_slider.end = new_max
-                self.ei_cutoff_slider.value = new_med
+                # Clamp value if it exceeds the new range
+                if self.ei_cutoff_slider.value > new_max:
+                    self.ei_cutoff_slider.value = new_max
 
     def _on_filter_slider_change(self, event) -> None:
         """Callback for gf or Ei cutoff slider change."""
