@@ -1205,8 +1205,7 @@ class EmissionLines:
             print(k, v)
             unite_dict[k.capitalize()] = v
 
-        for g in groups:
-            # Handle the 'name' in the first element if present
+        for g in groups[1:]:
             # Identify group name and line string
             group_name = None
             line_string = None
