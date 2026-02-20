@@ -1365,6 +1365,15 @@ class EmissionLines:
 
                         lines.append({'Wavelength': wave, 'RelStrength': rel_strength})
 
+                    # Deduplicate lines by wavelength (keep first occurrence)
+                    seen_waves = set()
+                    unique_lines = []
+                    for line in lines:
+                        if line['Wavelength'] not in seen_waves:
+                            seen_waves.add(line['Wavelength'])
+                            unique_lines.append(line)
+                    lines = unique_lines
+
                     species_entry = {'Name': species_name, 'LineType': line_type}
                     if additional:
                         if isinstance(additional, list):

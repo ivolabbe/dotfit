@@ -1058,6 +1058,11 @@ class LineExplorer:
             else:
                 tooltip_dict['Ek'] = 'N/A'
 
+            if 'line_ratio' in row.colnames and not np.isnan(row['line_ratio']):
+                tooltip_dict['Ratio'] = f"{row['line_ratio']:.3f}"
+            else:
+                tooltip_dict['Ratio'] = 'N/A'
+
             # Parse lower/upper level terms from 'terms' column (e.g. "a6D-u6D*")
             if 'terms' in row.colnames and row['terms'] and str(row['terms']).strip():
                 terms_str = str(row['terms']).strip()
@@ -1089,6 +1094,7 @@ class LineExplorer:
                 'Aki': [d['Aki'] for d in hover_data],
                 'Ei': [d['Ei'] for d in hover_data],
                 'Ek': [d['Ek'] for d in hover_data],
+                'Ratio': [d['Ratio'] for d in hover_data],
                 'Lower': [d['Lower'] for d in hover_data],
                 'Upper': [d['Upper'] for d in hover_data],
             }
@@ -1101,6 +1107,7 @@ class LineExplorer:
                     ('Line', '@Line'),
                     ('Ion', '@Ion'),
                     ('λ (Å)', '@Wave'),
+                    ('Ratio', '@Ratio'),
                     ('Lower', '@Lower'),
                     ('Upper', '@Upper'),
                     ('gf', '@gf'),
@@ -1113,7 +1120,7 @@ class LineExplorer:
             hover_points = hv.Points(
                 points_dict,
                 kdims=['x', 'y'],
-                vdims=['Line', 'Ion', 'Wave', 'gf', 'Aki', 'Ei', 'Ek', 'Lower', 'Upper'],
+                vdims=['Line', 'Ion', 'Wave', 'Ratio', 'gf', 'Aki', 'Ei', 'Ek', 'Lower', 'Upper'],
             ).opts(
                 size=1,
                 alpha=0.01,

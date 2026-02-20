@@ -1,0 +1,248 @@
+{
+    "Name": "bla",
+    "Unit": "Angstrom",
+    "Groups": {
+        "emission1": {
+            "TieRedshift": true,
+            "TieDispersion": true,
+            "Species": [
+                {
+                    "Name": "[FeII]m14",
+                    "LineType": "emission",
+                    "Lines": [
+                        {
+                            "Wavelength": 4288.6,
+                            "RelStrength": 1.0
+                        },
+                        {
+                            "Wavelength": 4360.557,
+                            "RelStrength": 0.7224460747837402
+                        },
+                        {
+                            "Wavelength": 4415.02,
+                            "RelStrength": 0.5030715232045102
+                        },
+                        {
+                            "Wavelength": 4453.347,
+                            "RelStrength": 0.31862421865806445
+                        },
+                        {
+                            "Wavelength": 4476.158,
+                            "RelStrength": 0.15436027303453065
+                        }
+                    ]
+                },
+                {
+                    "Name": "[FeII]m20",
+                    "LineType": "emission",
+                    "Lines": [
+                        {
+                            "Wavelength": 4383.976,
+                            "RelStrength": 0.017289527535866236
+                        },
+                        {
+                            "Wavelength": 4417.508,
+                            "RelStrength": 1.0
+                        },
+                        {
+                            "Wavelength": 4433.692,
+                            "RelStrength": 0.008426373793441723
+                        },
+                        {
+                            "Wavelength": 4459.198,
+                            "RelStrength": 0.08526002120291488
+                        },
+                        {
+                            "Wavelength": 4471.552,
+                            "RelStrength": 0.002385347848367914
+                        },
+                        {
+                            "Wavelength": 4490.009,
+                            "RelStrength": 0.023220513772652714
+                        },
+                        {
+                            "Wavelength": 4493.896,
+                            "RelStrength": 0.1299853120786473
+                        },
+                        {
+                            "Wavelength": 4510.87,
+                            "RelStrength": 0.004933737724031088
+                        },
+                        {
+                            "Wavelength": 4516.169,
+                            "RelStrength": 0.019723220182343355
+                        },
+                        {
+                            "Wavelength": 4529.654,
+                            "RelStrength": 0.006781877221767632
+                        },
+                        {
+                            "Wavelength": 4534.277,
+                            "RelStrength": 0.0013722042452446019
+                        }
+                    ]
+                },
+                {
+                    "Name": "[FeII]m23",
+                    "LineType": "emission",
+                    "Lines": [
+                        {
+                            "Wavelength": 4640.973,
+                            "RelStrength": 0.23582776110288345
+                        },
+                        {
+                            "Wavelength": 4665.753,
+                            "RelStrength": 0.07337995664087232
+                        },
+                        {
+                            "Wavelength": 4729.393,
+                            "RelStrength": 0.43747007454299663
+                        },
+                        {
+                            "Wavelength": 4773.399,
+                            "RelStrength": 0.021904051331911353
+                        },
+                        {
+                            "Wavelength": 4799.617,
+                            "RelStrength": 0.06219715234138215
+                        },
+                        {
+                            "Wavelength": 4890.988,
+                            "RelStrength": 1.0
+                        },
+                        {
+                            "Wavelength": 5008.027,
+                            "RelStrength": 0.07413830961333787
+                        }
+                    ]
+                },
+                {
+                    "Name": "[FeII]m45",
+                    "LineType": "emission",
+                    "Lines": [
+                        {
+                            "Wavelength": 4746.816,
+                            "RelStrength": 0.002350258064290253
+                        },
+                        {
+                            "Wavelength": 4776.063,
+                            "RelStrength": 0.04542863922125392
+                        },
+                        {
+                            "Wavelength": 4815.89,
+                            "RelStrength": 1.0
+                        },
+                        {
+                            "Wavelength": 4854.099,
+                            "RelStrength": 0.002211021340656495
+                        },
+                        {
+                            "Wavelength": 4875.857,
+                            "RelStrength": 0.03133644471837405
+                        },
+                        {
+                            "Wavelength": 4906.721,
+                            "RelStrength": 0.07594124136622805
+                        },
+                        {
+                            "Wavelength": 4948.766,
+                            "RelStrength": 0.142924295752476
+                        },
+                        {
+                            "Wavelength": 4952.137,
+                            "RelStrength": 0.016996271530742593
+                        },
+                        {
+                            "Wavelength": 4974.785,
+                            "RelStrength": 0.024700636872006715
+                        },
+                        {
+                            "Wavelength": 5006.918,
+                            "RelStrength": 0.02735069498255137
+                        },
+                        {
+                            "Wavelength": 5021.644,
+                            "RelStrength": 0.017381794840774553
+                        },
+                        {
+                            "Wavelength": 5044.934,
+                            "RelStrength": 0.012418955713838796
+                        }
+                    ]
+                },
+                {
+                    "Name": "[FeII]m48",
+                    "LineType": "emission",
+                    "Lines": [
+                        {
+                            "Wavelength": 4178.379,
+                            "RelStrength": 0.0707403804084554
+                        },
+                        {
+                            "Wavelength": 4232.755,
+                            "RelStrength": 0.0013819194520089991
+                        },
+                        {
+                            "Wavelength": 4245.169,
+                            "RelStrength": 1.0
+                        },
+                        {
+                            "Wavelength": 4246.013,
+                            "RelStrength": 0.04514376088339529
+                        },
+                        {
+                            "Wavelength": 4278.04,
+                            "RelStrength": 0.31260692547227503
+                        },
+                        {
+                            "Wavelength": 4307.109,
+                            "RelStrength": 0.017763697656576448
+                        },
+                        {
+                            "Wavelength": 4320.837,
+                            "RelStrength": 0.09057242055648594
+                        },
+                        {
+                            "Wavelength": 4348.081,
+                            "RelStrength": 0.21437352754627334
+                        },
+                        {
+                            "Wavelength": 4354.008,
+                            "RelStrength": 0.13957168193963157
+                        },
+                        {
+                            "Wavelength": 4359.592,
+                            "RelStrength": 0.04076093347586666
+                        },
+                        {
+                            "Wavelength": 4373.658,
+                            "RelStrength": 0.0459843504692386
+                        }
+                    ]
+                },
+                {
+                    "Name": "[FeII]m51",
+                    "LineType": "emission",
+                    "Lines": [
+                        {
+                            "Wavelength": 4115.636,
+                            "RelStrength": 1.0
+                        },
+                        {
+                            "Wavelength": 4180.142,
+                            "RelStrength": 0.10936075623926925
+                        },
+                        {
+                            "Wavelength": 4212.292,
+                            "RelStrength": 0.36639517589100606
+                        },
+                        {
+                            "Wavelength": 4252.643,
+                            "RelStrength": 0.09430659160253538
+                        }
+                    ]
+                }
+            ]
+        }
+    }
+}
