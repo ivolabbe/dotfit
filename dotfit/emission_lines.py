@@ -1400,9 +1400,11 @@ class EmissionLines:
             :meth:`to_unite` group lists.
         """
         parts = []
+        ion_clean = ion.rstrip('*')
+        ion_star = '*' if ion.endswith('*') else ''
         for w in wavelengths:
-            suffix = '*' if w < 0 else ''
-            parts.append(f"{ion}-{abs(w)}{suffix}")
+            suffix = '*' if w < 0 else ion_star
+            parts.append(f"{ion_clean}-{abs(w)}{suffix}")
         return {linetype: ','.join(parts)}
 
 

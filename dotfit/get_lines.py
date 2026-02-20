@@ -68,8 +68,12 @@ datadir = Path(dotfit.__file__).parent / 'data/emission_lines/'
 
 el = EmissionLines()
 
-r = get_line_nist('Fe II', wave=[7150, 7160], verbose=True, classification='forbidden')
-r
+# r = get_line_nist('Fe II', wave=[7150, 7160], verbose=True, classification='forbidden')
+
+feii = [4178,4245,4278,4289,4418,4597,4453,4476,4459,4490,4641,4776,4816,5017,5045,5113,5159,5263,5270,5275,5335,5378,5435,5529,5747,5769,5846,5903] # fmt: skip
+el.to_lines('emission', '[FeII]', feii)
+
+
 # %%
 # from astropy.units import Quantity
 # Quantity(spec['wave'])
