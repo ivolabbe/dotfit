@@ -967,6 +967,11 @@ class EmissionLines:
             new_table (Table): Table containing new lines to add.
             sort (bool): If True, sort the table by 'wave_vac' after adding.
         """
+        # Cast mismatched column types to the existing table's dtype
+        for col in set(self.table.colnames) & set(new_table.colnames):
+            if self.table[col].dtype != new_table[col].dtype:
+                new_table[col] = new_table[col].astype(self.table[col].dtype)
+
         self.table = vstack([self.table, new_table])
 
         if sort:
@@ -1805,14 +1810,15 @@ def read_sigut_table(path: str | Path) -> Table:
         terms_list.append(terms)
         jijk_list.append(jijk)
 
-    # Create keys similar to NIST format
-    keys = [f"FeII-{int(w)}" for w in waves]
+    # Create keys using vacuum wavelengths (consistent with wave_vac column)
+    vac_waves = air_to_vacuum(waves)
+    keys = [f"FeII-{int(w)}" for w in vac_waves]
 
     tab = Table(
         {
             'key': keys,
             'ion': ['Fe II'] * len(waves),
-            'wave_vac': air_to_vacuum(waves),
+            'wave_vac': vac_waves,
             'Ei': lower_energies,
             'Ek': [0.0] * len(waves),
             'Aki': [0.0] * len(waves),
