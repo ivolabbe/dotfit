@@ -1812,7 +1812,7 @@ def read_sigut_table(path: str | Path) -> Table:
 
     # Create keys using vacuum wavelengths (consistent with wave_vac column)
     vac_waves = air_to_vacuum(waves)
-    keys = [f"FeII-{int(w)}" for w in vac_waves]
+    keys = [f"FeII-{round(w)}" for w in vac_waves]
 
     tab = Table(
         {
