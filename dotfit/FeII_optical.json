@@ -1,0 +1,380 @@
+{
+    "Name": "FeII_optical",
+    "Unit": "Angstrom",
+    "Groups": {
+        "emission1": {
+            "TieRedshift": true,
+            "TieDispersion": true,
+            "Species": [
+                {
+                    "Name": "FeII_a4G",
+                    "LineType": "emission",
+                    "Lines": [
+                        {
+                            "Wavelength": 5199.024,
+                            "RelStrength": 0.4135496030074466
+                        },
+                        {
+                            "Wavelength": 5236.082,
+                            "RelStrength": 0.5266757355386331
+                        },
+                        {
+                            "Wavelength": 5256.392,
+                            "RelStrength": 0.046178319880325024
+                        },
+                        {
+                            "Wavelength": 5266.277,
+                            "RelStrength": 0.033506620222308034
+                        },
+                        {
+                            "Wavelength": 5277.47,
+                            "RelStrength": 0.7407801753402548
+                        },
+                        {
+                            "Wavelength": 5318.094,
+                            "RelStrength": 1.0
+                        },
+                        {
+                            "Wavelength": 5318.263,
+                            "RelStrength": 0.07272667717295764
+                        },
+                        {
+                            "Wavelength": 5327.034,
+                            "RelStrength": 0.1969791585392246
+                        },
+                        {
+                            "Wavelength": 5339.217,
+                            "RelStrength": 0.009942811290908888
+                        },
+                        {
+                            "Wavelength": 5364.36,
+                            "RelStrength": 0.11710927609704395
+                        },
+                        {
+                            "Wavelength": 5415.578,
+                            "RelStrength": 0.012650876320561173
+                        },
+                        {
+                            "Wavelength": 5426.765,
+                            "RelStrength": 0.034900064397147545
+                        },
+                        {
+                            "Wavelength": 5933.699,
+                            "RelStrength": 0.0009482713813792954
+                        },
+                        {
+                            "Wavelength": 5993.036,
+                            "RelStrength": 0.01860596882010099
+                        }
+                    ]
+                },
+                {
+                    "Name": "FeII_a6S",
+                    "LineType": "emission",
+                    "Lines": [
+                        {
+                            "Wavelength": 4595.114,
+                            "RelStrength": 6.674909600701012e-05
+                        },
+                        {
+                            "Wavelength": 4602.667,
+                            "RelStrength": 0.00013913806154529316
+                        },
+                        {
+                            "Wavelength": 4658.285,
+                            "RelStrength": 0.0013124919256389147
+                        },
+                        {
+                            "Wavelength": 4665.014,
+                            "RelStrength": 0.0004055920750705951
+                        },
+                        {
+                            "Wavelength": 4732.777,
+                            "RelStrength": 0.003261959477027194
+                        },
+                        {
+                            "Wavelength": 4925.302,
+                            "RelStrength": 0.17869233719043665
+                        },
+                        {
+                            "Wavelength": 5019.84,
+                            "RelStrength": 0.3367586335661276
+                        },
+                        {
+                            "Wavelength": 5170.473,
+                            "RelStrength": 1.0
+                        },
+                        {
+                            "Wavelength": 5258.401,
+                            "RelStrength": 0.00031138592652637636
+                        },
+                        {
+                            "Wavelength": 5285.579,
+                            "RelStrength": 0.004760267348944056
+                        }
+                    ]
+                },
+                {
+                    "Name": "FeII_b4F",
+                    "LineType": "emission",
+                    "Lines": [
+                        {
+                            "Wavelength": 4089.909,
+                            "RelStrength": 0.0007314420591478368
+                        },
+                        {
+                            "Wavelength": 4139.572,
+                            "RelStrength": 0.0018535182030604115
+                        },
+                        {
+                            "Wavelength": 4474.184,
+                            "RelStrength": 0.018171761335648545
+                        },
+                        {
+                            "Wavelength": 4490.442,
+                            "RelStrength": 0.060109182954549666
+                        },
+                        {
+                            "Wavelength": 4492.665,
+                            "RelStrength": 0.14458315450272194
+                        },
+                        {
+                            "Wavelength": 4509.553,
+                            "RelStrength": 0.22356712047459684
+                        },
+                        {
+                            "Wavelength": 4516.605,
+                            "RelStrength": 0.24339435544988028
+                        },
+                        {
+                            "Wavelength": 4521.492,
+                            "RelStrength": 0.15430032510961825
+                        },
+                        {
+                            "Wavelength": 4523.902,
+                            "RelStrength": 0.4574542058411359
+                        },
+                        {
+                            "Wavelength": 4535.439,
+                            "RelStrength": 0.0368960694941765
+                        },
+                        {
+                            "Wavelength": 4542.797,
+                            "RelStrength": 0.06471552192309395
+                        },
+                        {
+                            "Wavelength": 4550.749,
+                            "RelStrength": 1.0
+                        },
+                        {
+                            "Wavelength": 4557.17,
+                            "RelStrength": 0.3846240753586148
+                        },
+                        {
+                            "Wavelength": 4577.622,
+                            "RelStrength": 0.06718426967625565
+                        },
+                        {
+                            "Wavelength": 4584.119,
+                            "RelStrength": 0.07803568409277532
+                        },
+                        {
+                            "Wavelength": 4585.121,
+                            "RelStrength": 0.5879469071664051
+                        },
+                        {
+                            "Wavelength": 4596.97,
+                            "RelStrength": 0.0060654584777911505
+                        },
+                        {
+                            "Wavelength": 4621.815,
+                            "RelStrength": 0.03943327551380694
+                        },
+                        {
+                            "Wavelength": 4630.636,
+                            "RelStrength": 0.3286796482034871
+                        },
+                        {
+                            "Wavelength": 4649.537,
+                            "RelStrength": 0.0013804164903600661
+                        },
+                        {
+                            "Wavelength": 4668.064,
+                            "RelStrength": 0.043973836044501544
+                        },
+                        {
+                            "Wavelength": 4835.216,
+                            "RelStrength": 0.0005352657567435784
+                        },
+                        {
+                            "Wavelength": 4895.187,
+                            "RelStrength": 0.002002416163357713
+                        },
+                        {
+                            "Wavelength": 4926.296,
+                            "RelStrength": 0.0013159501254579188
+                        },
+                        {
+                            "Wavelength": 4994.751,
+                            "RelStrength": 0.013791551413218455
+                        },
+                        {
+                            "Wavelength": 5038.325,
+                            "RelStrength": 0.0022657194239150483
+                        },
+                        {
+                            "Wavelength": 5102.086,
+                            "RelStrength": 0.002619567247089109
+                        },
+                        {
+                            "Wavelength": 5121.779,
+                            "RelStrength": 0.0034282415945815843
+                        },
+                        {
+                            "Wavelength": 5134.099,
+                            "RelStrength": 0.00506555398718762
+                        },
+                        {
+                            "Wavelength": 5138.233,
+                            "RelStrength": 0.001583383939581678
+                        },
+                        {
+                            "Wavelength": 5147.561,
+                            "RelStrength": 0.009132262436982709
+                        },
+                        {
+                            "Wavelength": 5152.376,
+                            "RelStrength": 0.0012783778500219203
+                        },
+                        {
+                            "Wavelength": 5155.845,
+                            "RelStrength": 0.005362571599325565
+                        },
+                        {
+                            "Wavelength": 5162.622,
+                            "RelStrength": 0.002379621550614014
+                        },
+                        {
+                            "Wavelength": 5173.08,
+                            "RelStrength": 0.003900535287068744
+                        }
+                    ]
+                },
+                {
+                    "Name": "FeII_b4P",
+                    "LineType": "emission",
+                    "Lines": [
+                        {
+                            "Wavelength": 4003.215,
+                            "RelStrength": 0.039204929444367036
+                        },
+                        {
+                            "Wavelength": 4088.438,
+                            "RelStrength": 0.0009593820752815293
+                        },
+                        {
+                            "Wavelength": 4123.831,
+                            "RelStrength": 0.03090078848107112
+                        },
+                        {
+                            "Wavelength": 4129.913,
+                            "RelStrength": 0.008398269056703694
+                        },
+                        {
+                            "Wavelength": 4174.637,
+                            "RelStrength": 0.4925570423673751
+                        },
+                        {
+                            "Wavelength": 4180.04,
+                            "RelStrength": 0.3293403032827835
+                        },
+                        {
+                            "Wavelength": 4234.364,
+                            "RelStrength": 1.0
+                        },
+                        {
+                            "Wavelength": 4259.353,
+                            "RelStrength": 0.025985088758228216
+                        },
+                        {
+                            "Wavelength": 4274.529,
+                            "RelStrength": 0.018041345319818797
+                        },
+                        {
+                            "Wavelength": 4297.781,
+                            "RelStrength": 0.09599100809093344
+                        },
+                        {
+                            "Wavelength": 4304.386,
+                            "RelStrength": 0.21201672491012502
+                        },
+                        {
+                            "Wavelength": 4352.992,
+                            "RelStrength": 0.783502413733135
+                        },
+                        {
+                            "Wavelength": 4370.639,
+                            "RelStrength": 0.025831539693715266
+                        },
+                        {
+                            "Wavelength": 4386.619,
+                            "RelStrength": 0.1627698533727743
+                        },
+                        {
+                            "Wavelength": 4387.817,
+                            "RelStrength": 0.0005743767920267169
+                        },
+                        {
+                            "Wavelength": 4418.07,
+                            "RelStrength": 0.3043939175735409
+                        },
+                        {
+                            "Wavelength": 4462.691,
+                            "RelStrength": 0.005863214617578197
+                        },
+                        {
+                            "Wavelength": 4581.346,
+                            "RelStrength": 0.01923753510906774
+                        },
+                        {
+                            "Wavelength": 4585.284,
+                            "RelStrength": 0.0040451529057028025
+                        },
+                        {
+                            "Wavelength": 4650.246,
+                            "RelStrength": 0.0031330706007578796
+                        },
+                        {
+                            "Wavelength": 4667.111,
+                            "RelStrength": 0.0012074609976053916
+                        },
+                        {
+                            "Wavelength": 4671.489,
+                            "RelStrength": 0.008129820129426474
+                        },
+                        {
+                            "Wavelength": 4714.512,
+                            "RelStrength": 0.0014313749786915477
+                        },
+                        {
+                            "Wavelength": 4856.904,
+                            "RelStrength": 0.003582330259491053
+                        },
+                        {
+                            "Wavelength": 4872.638,
+                            "RelStrength": 0.008753803238753279
+                        },
+                        {
+                            "Wavelength": 4992.518,
+                            "RelStrength": 0.00263559250410744
+                        },
+                        {
+                            "Wavelength": 5002.138,
+                            "RelStrength": 0.0022223229362709675
+                        }
+                    ]
+                }
+            ]
+        }
+    }
+}

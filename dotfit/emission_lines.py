@@ -552,6 +552,159 @@ def plot_lines(
         plt.legend(frameon=False, ncol=3)
 
 
+def plot_ion_terms(
+    tab: Table,
+    ion: str = "Fe II",
+    wave: tuple[float, float] | None = None,
+    gf_min: float = 0.001,
+    height: str = "gf",
+    ax=None,
+    log: bool = False,
+    label_strong: float | None = None,
+    figsize: tuple[float, float] = (12, 4),
+    title: str | None = None,
+    fwhm: float | None = None,
+    ngrid: int = 4000,
+    eV: tuple[float, float] | None = None,
+    Te: float = 1e4,
+):
+    """Plot emission lines as a stick spectrum, colour-coded by lower term.
+
+    Args:
+        tab: Astropy table with columns ``wave_vac``, ``gf``, ``terms``
+            (and optionally ``ion``).
+        ion: Ion to select (e.g. ``"Fe II"``).  Rows whose ``ion`` column
+            does not contain this string are dropped.
+        wave: ``(lam_min, lam_max)`` wavelength window in Angstrom.
+        gf_min: Minimum oscillator strength to plot.
+        height: Column to use for stick heights (``"gf"`` or ``"Aki"``).
+        ax: Matplotlib axes.  If *None*, a new figure is created.
+        log: If *True*, use a log scale for the y-axis.
+        label_strong: If set, annotate lines with ``gf >= label_strong``
+            with their wavelength.
+        figsize: Figure size when *ax* is *None*.
+        title: Plot title.
+        fwhm: If set, convolve each line with a Gaussian of this FWHM
+            (in km/s) and plot the summed profile per lower-term group.
+        ngrid: Number of wavelength grid points for the convolved profiles.
+        eV: ``(Ei_min, Ei_max)`` lower-level energy range in eV.
+            Requires an ``Ei`` column in the table.
+        Te: Excitation temperature in K.  Applies a Boltzmann weight
+            ``gf * exp(-Ei / kT)`` to the stick heights.  Set to
+            *None* to disable.
+
+    Returns:
+        ``matplotlib.axes.Axes``
+    """
+    import matplotlib.pyplot as plt
+
+    t = tab.copy()
+
+    # Filter by ion
+    if "ion" in t.colnames:
+        mask = [ion in str(r).strip() for r in t["ion"]]
+        t = t[mask]
+
+    # Filter by wavelength range
+    if wave is not None:
+        t = t[(t["wave_vac"] >= wave[0]) & (t["wave_vac"] <= wave[1])]
+
+    # Filter by gf
+    t = t[t["gf"] >= gf_min]
+
+    # Filter by lower-level energy
+    if eV is not None:
+        if "Ei" not in t.colnames:
+            logger.warning("No 'Ei' column — eV filter ignored")
+        else:
+            ei = t["Ei"].astype(float)
+            t = t[(ei >= eV[0]) & (ei <= eV[1])]
+
+    if len(t) == 0:
+        logger.warning("No lines match the selection")
+        return ax
+
+    # Extract lower term from "lower-upper" terms column
+    lower_terms = [str(r).split("-")[0] for r in t["terms"]]
+
+    # Unique lower terms sorted by number of lines (most first)
+    from collections import Counter
+    term_counts = Counter(lower_terms)
+    unique_terms = [term for term, _ in term_counts.most_common()]
+
+    # Colour map
+    cmap = plt.cm.tab20
+    colors = {term: cmap(i % 20) for i, term in enumerate(unique_terms)}
+
+    if ax is None:
+        fig, ax = plt.subplots(figsize=figsize)
+
+    h = t[height].astype(float)
+
+    # Boltzmann-weight: h × exp(-Ei / kT)
+    if Te is not None and "Ei" in t.colnames:
+        k_B_eV = 8.617333262e-5  # eV/K
+        kT = k_B_eV * Te
+        ei = t["Ei"].astype(float)
+        h = h * np.exp(-ei / kT)
+
+    for term in unique_terms:
+        idx = [i for i, lt in enumerate(lower_terms) if lt == term]
+        wv = t["wave_vac"][idx].astype(float)
+        hv = h[idx]
+
+        ax.vlines(wv, 0, hv, colors=colors[term], alpha=0.8, lw=1.5,
+                  label=term)
+
+        # Annotate strong lines
+        if label_strong is not None:
+            for w, g in zip(wv, hv):
+                if g >= label_strong:
+                    ax.text(w, g, f" {w:.0f}", fontsize=7, rotation=60,
+                            va="bottom", ha="left", color=colors[term])
+
+    # Convolved Gaussian profiles per lower-term group
+    if fwhm is not None:
+        c_kms = 299_792.458
+        wv_all = t["wave_vac"].astype(float)
+        wmin, wmax = np.min(wv_all), np.max(wv_all)
+        sigma_max = (fwhm / 2.354820045) * (wmax / c_kms)
+        pad = 5 * sigma_max + 2.0
+        lam = np.linspace(wmin - pad, wmax + pad, ngrid)
+
+        for term in unique_terms:
+            idx = [i for i, lt in enumerate(lower_terms) if lt == term]
+            mu = t["wave_vac"][idx].astype(float)
+            amp = h[idx]
+            prof = np.zeros_like(lam)
+            for mu_i, a_i in zip(mu, amp):
+                sig_i = (fwhm / 2.354820045) * (mu_i / c_kms)
+                if sig_i <= 0:
+                    continue
+                prof += a_i * np.exp(-0.5 * ((lam - mu_i) / sig_i) ** 2)
+
+            nonzero = prof > prof.max() * 1e-4
+            if np.any(nonzero):
+                ax.plot(lam[nonzero], prof[nonzero], color=colors[term],
+                        alpha=0.6, lw=1.2)
+
+    ax.set_xlabel(r"Wavelength $\lambda$ (Å)")
+    ylabel = (f"{height} " + r"$\times\, e^{-E_i/kT}$") if Te is not None and "Ei" in t.colnames else height
+    ax.set_ylabel(ylabel)
+    default_title = f"{ion} lines by lower term"
+    if Te is not None and "Ei" in t.colnames:
+        default_title += f"  ($T = {Te:.0f}$ K)"
+    ax.set_title(title or default_title)
+    ax.legend(fontsize=8, frameon=False, ncol=max(1, len(unique_terms) // 6),
+              loc="upper right")
+    if log:
+        ax.set_yscale("log")
+    ax.set_xlim(wave)
+    ax.axhline(0, color="k", lw=0.5)
+
+    return ax
+
+
 def plot_ion_models(
     ion='H I',
     wave_range=None,
@@ -1259,6 +1412,7 @@ class EmissionLines:
 
             # Prepare get_table kwargs
             additional = kwargs.pop('additional', None)
+            gf_min = kwargs.pop('gf_min', None)
             should_recalc = 'Te' in kwargs and ('ne' in kwargs or 'Ne' in kwargs)
 
             # Fetch tables for each alias
@@ -1268,17 +1422,26 @@ class EmissionLines:
                 try:
                     multiplet = alias.endswith('*')
                     alias = alias[:-1].strip() if multiplet else alias
+
                     t = None
-                    # If multiplet is requested, check if alias is a specific line key that belongs to a multiplet
-                    if multiplet and alias in self.table['key']:
-                        t = self.get_multiplet(alias)
+
+                    # Check for term-based alias (e.g. 'FeII-b4F')
+                    t = self._resolve_term_alias(alias, gf_min=gf_min, **kwargs)
 
                     if t is None:
-                        # Pass multiplet and kwargs (Te, Ne, etc.)
-                        t = self.get_table(alias, multiplet=multiplet, **kwargs)
-                    elif multiplet and should_recalc:
-                        # If we got a table from get_multiplet, ensure ratios are calculated if missing
-                        t = _ensure_multiplet_ratios(t, kwargs)
+                        # If multiplet is requested, check if alias is a specific line key that belongs to a multiplet
+                        if multiplet and alias in self.table['key']:
+                            t = self.get_multiplet(alias)
+
+                        if t is None:
+                            # Pass multiplet and kwargs (Te, Ne, etc.)
+                            t = self.get_table(alias, multiplet=multiplet, **kwargs)
+                        elif multiplet and should_recalc:
+                            # If we got a table from get_multiplet, ensure ratios are calculated if missing
+                            t = _ensure_multiplet_ratios(t, kwargs)
+                    else:
+                        # Term-based: always treat as multiplet
+                        multiplet = True
 
                     if t is not None and 'use_multiplet' not in t.colnames:
                         t = t.copy()
@@ -1292,6 +1455,13 @@ class EmissionLines:
             if not tables:
                 continue
 
+            # Ensure _term_group column exists in all tables before stacking
+            has_term_col = any('_term_group' in t.colnames for t in tables)
+            if has_term_col:
+                for t in tables:
+                    if '_term_group' not in t.colnames:
+                        t['_term_group'] = ''
+
             full_table = vstack(tables)
 
             # Group by Ion/Species
@@ -1301,51 +1471,72 @@ class EmissionLines:
                 mask = full_table['ion'] == ion
                 ion_table = full_table[mask]
 
-                # Determine subgroups based on multiplets
+                # Determine subgroups based on term groups or multiplets
                 subgroups = []
-                if 'use_multiplet' in ion_table.colnames:
-                    multi_mask = ion_table['use_multiplet'] & (ion_table['multiplet'] > 0)
-                    if np.any(multi_mask):
-                        for m in np.unique(ion_table['multiplet'][multi_mask]):
-                            subgroups.append(ion_table[multi_mask & (ion_table['multiplet'] == m)])
-                    non_multi = ion_table[~multi_mask]
-                    if len(non_multi) > 0:
-                        subgroups.append(non_multi)
-                else:
-                    subgroups.append(ion_table)
+                if '_term_group' in ion_table.colnames:
+                    # Term-based aliases: one subgroup per term
+                    term_vals = ion_table['_term_group'].astype(str)
+                    has_term = np.array([tv != '' for tv in term_vals])
+                    if np.any(has_term):
+                        for tg in np.unique(term_vals[has_term]):
+                            subgroups.append(ion_table[has_term & (term_vals == tg)])
+                    non_term = ion_table[~has_term]
+                    if len(non_term) > 0:
+                        # Fall through to multiplet logic for non-term rows
+                        ion_table = non_term
+                    else:
+                        ion_table = ion_table[:0]  # empty
+
+                if len(ion_table) > 0:
+                    if 'use_multiplet' in ion_table.colnames:
+                        multi_mask = ion_table['use_multiplet'] & (ion_table['multiplet'] > 0)
+                        if np.any(multi_mask):
+                            for m in np.unique(ion_table['multiplet'][multi_mask]):
+                                subgroups.append(ion_table[multi_mask & (ion_table['multiplet'] == m)])
+                        non_multi = ion_table[~multi_mask]
+                        if len(non_multi) > 0:
+                            subgroups.append(non_multi)
+                    else:
+                        subgroups.append(ion_table)
 
                 for species_table in subgroups:
+                    # Check if this is a term-based subgroup
+                    is_term = ('_term_group' in species_table.colnames
+                               and str(species_table['_term_group'][0]) != '')
+
                     # Normalize ratios per multiplet (weakest to 1.0)
                     if 'use_multiplet' in species_table.colnames:
                         use_multi = bool(np.any(species_table['use_multiplet']))
                     else:
                         use_multi = False
 
+                    # Term groups always use ratios
+                    if is_term:
+                        use_multi = True
+
                     if (
                         use_multi
-                        and 'multiplet' in species_table.colnames
                         and 'line_ratio' in species_table.colnames
                     ):
-                        # Since we split by multiplet, we can just normalize the whole table if m > 0
-                        m_vals = species_table['multiplet']
-                        if len(m_vals) > 0 and m_vals[0] > 0:
-                            ratios = species_table['line_ratio']
-                            # Handle masked/nan
-                            if hasattr(ratios, 'mask'):
-                                valid_mask = ~ratios.mask & ~np.isnan(ratios)
-                            else:
-                                valid_mask = ~np.isnan(ratios)
-                            # this may not be necessary but just in case
-                            if np.any(valid_mask):
-                                max_r = np.max(ratios[valid_mask])
-                                if max_r > 0:
-                                    species_table['line_ratio'] = ratios / max_r
+                        ratios = species_table['line_ratio']
+                        # Handle masked/nan
+                        if hasattr(ratios, 'mask'):
+                            valid_mask = ~ratios.mask & ~np.isnan(ratios)
+                        else:
+                            valid_mask = ~np.isnan(ratios)
+                        if np.any(valid_mask):
+                            max_r = np.max(ratios[valid_mask])
+                            if max_r > 0:
+                                species_table['line_ratio'] = ratios / max_r
 
                     # Format Species Name: 'H I' -> 'HI', '[O III]' -> '[OIII]'
                     species_name = ion.replace(' ', '')
 
-                    # Append multiplet ID to species name if applicable
-                    if use_multi and 'multiplet' in species_table.colnames:
+                    if is_term:
+                        # Use term name (e.g. 'FeII_b4F')
+                        species_name = f"{species_name}_{species_table['_term_group'][0]}"
+                    elif use_multi and 'multiplet' in species_table.colnames:
+                        # Append multiplet ID
                         m_vals = species_table['multiplet']
                         if len(m_vals) > 0 and m_vals[0] > 0:
                             species_name = f"{species_name}m{m_vals[0]}"
@@ -1357,7 +1548,7 @@ class EmissionLines:
                         # Handle RelStrength
                         rel_strength = None
                         # Only use ratio if multiplet calculation was enabled
-                        if use_multi and 'line_ratio' in row.colnames and row['multiplet'] > 0:
+                        if use_multi and 'line_ratio' in row.colnames and (is_term or row['multiplet'] > 0):
                             val = row['line_ratio']
                             if not np.ma.is_masked(val) and not np.isnan(val):
                                 rel_strength = float(val)
@@ -1396,29 +1587,106 @@ class EmissionLines:
 
         return unite_dict
 
-    @staticmethod
-    def to_lines(linetype: str, ion: str, wavelengths: list[float]) -> dict:
-        """Build a unite-style line dict from explicit wavelengths.
+    def _resolve_term_alias(self, alias: str, gf_min: float | None = None,
+                            **kwargs) -> Table | None:
+        """Try to resolve an alias as ``ion-term`` (e.g. ``FeII-b4F``).
 
-        Negative wavelengths are treated as multiplet lines (appends ``*``).
+        Returns a filtered table if the alias matches, or *None* if it
+        does not look like a term alias.
+        """
+        import re
+
+        if '-' not in alias:
+            return None
+        ion_part, term_part = alias.rsplit('-', 1)
+
+        # Term names start with a lowercase letter (e.g. b4F, a6S)
+        # Wavelengths are numeric — skip those
+        try:
+            float(term_part)
+            return None
+        except ValueError:
+            pass
+
+        # Format ion for table lookup, preserving brackets:
+        # '[FeII]' -> '[Fe II]', 'FeII' -> 'Fe II'
+        # Extract bracket prefix/suffix if present
+        prefix = '[' if ion_part.startswith('[') else ''
+        suffix = ']' if ion_part.endswith(']') else ''
+        ion_core = ion_part.lstrip('[').rstrip(']')
+        ion_core_spaced = re.sub(r'(?<!\s)([IVX])', r' \1', ion_core, count=1)
+        ion_spaced = f"{prefix}{ion_core_spaced}{suffix}"
+
+        tab = self.table
+        ion_mask = (tab['ion'] == ion_part) | (tab['ion'] == ion_spaced)
+        tab = tab[ion_mask]
+
+        if 'wave' in kwargs and kwargs['wave'] is not None:
+            w = kwargs['wave']
+            tab = tab[(tab['wave_vac'] >= w[0]) & (tab['wave_vac'] <= w[1])]
+
+        if gf_min is not None and 'gf' in tab.colnames:
+            tab = tab[tab['gf'] >= gf_min]
+
+        if 'terms' not in tab.colnames:
+            return None
+
+        lower_terms = [str(r).split('-')[0] for r in tab['terms']]
+        mask = [lt == term_part for lt in lower_terms]
+        tab = tab[mask]
+
+        if len(tab) == 0:
+            logger.warning(f"No lines for term '{term_part}' in {ion_part}")
+            return None
+
+        # Assign multiplets and compute ratios
+        tab = assign_multiplets(tab, lower_only=True)
+        Te = kwargs.get('Te', 10_000)
+        Ne = kwargs.get('Ne', kwargs.get('ne', 1e2))
+        tab = compute_line_ratios(tab, Te=Te, Ne=Ne)
+
+        # Tag with term name so to_unite keeps each term as one Species
+        tab['_term_group'] = term_part
+
+        return tab
+
+    @staticmethod
+    def to_lines(linetype: str, ion: str, wavelengths: list[float] | list[str],
+                 **kwargs) -> dict:
+        """Build a unite-style line dict from wavelengths or lower-term names.
 
         Args:
             linetype: Line type key (e.g. ``'emission'``).
-            ion: Ion label (e.g. ``'FeII'``).
-            wavelengths: Wavelengths in Angstrom. Use negative values to
-                flag multiplet lines.
+            ion: Ion label (e.g. ``'[FeII]'``).
+            wavelengths: Wavelengths in Angstrom **or** lower-term names
+                (e.g. ``['b4F', 'a6S']``).  Negative wavelengths flag
+                multiplet lines (appends ``*``).  Term names are passed
+                through as ``ion-term`` aliases for :meth:`to_unite` to
+                resolve.
+            **kwargs: Extra keys forwarded into the dict (e.g.
+                ``gf_min=1e-5``, ``wave=[4000, 6000]``).
 
         Returns:
-            Dict of ``{linetype: 'ion-w1,ion-w2*,...'}`` ready for
-            :meth:`to_unite` group lists.
+            Dict ready for :meth:`to_unite` group lists.
         """
-        parts = []
-        ion_clean = ion.rstrip('*')
+        ion_strip = ion.replace('[', '').replace(']', '').rstrip('*')
         ion_star = '*' if ion.endswith('*') else ''
-        for w in wavelengths:
-            suffix = '*' if w < 0 else ion_star
-            parts.append(f"{ion_clean}-{abs(w)}{suffix}")
-        return {linetype: ','.join(parts)}
+
+        parts = []
+        if wavelengths and isinstance(wavelengths[0], str):
+            # Term names — preserve brackets so to_unite can distinguish
+            # [FeII] (forbidden) from FeII (permitted)
+            ion_base = ion.rstrip('*')
+            for term in wavelengths:
+                parts.append(f"{ion_base}-{term}")
+        else:
+            for w in wavelengths:
+                suffix = '*' if w < 0 else ion_star
+                parts.append(f"{ion_strip}-{abs(w)}{suffix}")
+
+        result = {linetype: ','.join(parts)}
+        result.update(kwargs)
+        return result
 
 
 def read_kurucz_table(
